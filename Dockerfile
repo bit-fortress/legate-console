@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 ARG VITE_API_BASE_URL=
 WORKDIR /app
