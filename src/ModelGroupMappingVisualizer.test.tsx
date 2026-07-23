@@ -22,7 +22,10 @@ const labels: ModelGroupMappingVisualizerLabels = {
   deleteModel: 'Delete model',
   modelConfiguration: 'Model configuration',
   noModelSelected: 'No model selected',
-  selectModel: 'Select model'
+  selectModel: 'Select model',
+  layerTraffic: 'Layer traffic distribution',
+  trafficShare: 'Traffic share',
+  noTraffic: 'No model traffic in this layer'
 };
 
 const endpoints = [
@@ -54,7 +57,7 @@ describe('ModelGroupMappingVisualizer', () => {
 
   it('edits the selected node through the provider and model controls', async () => {
     const user = userEvent.setup();
-    const onChangeMapping = vi.fn();
+    const onChangeMapping = vi.fn((index: number) => index);
     renderVisualizer({ onChangeMapping });
 
     await user.click(screen.getByRole('button', { name: 'Model gpt-4o' }));
@@ -78,6 +81,39 @@ describe('ModelGroupMappingVisualizer', () => {
     expect(onRemoveMapping).toHaveBeenCalledWith(1);
     expect(screen.getByRole('complementary', { name: 'Model configuration' })).toHaveTextContent('No model selected');
   });
+
+  it('numbers fallback pools by visible order even when tier values have gaps', () => {
+    renderVisualizer({
+      mappings: [
+        mappings[0],
+        { ...mappings[1], tier: 2 },
+        { ...mappings[1], endpointId: 1, modelId: 'gpt-4.1', tier: 5 }
+      ]
+    });
+
+    expect(screen.getByRole('region', { name: 'Layer 1' })).toHaveTextContent('Primary pool');
+    expect(screen.getByRole('region', { name: 'Layer 3' })).toHaveTextContent('Fallback 1');
+    expect(screen.getByRole('region', { name: 'Layer 6' })).toHaveTextContent('Fallback 2');
+  });
+
+  it('shows a selected layer weight ring and per-model traffic percentages', async () => {
+    const user = userEvent.setup();
+    renderVisualizer({
+      mappings: [
+        { ...mappings[0], weight: 100 },
+        { ...mappings[1], tier: 0, weight: 300 }
+      ]
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Layer 1 Layer traffic distribution' }));
+
+    const inspector = screen.getByRole('complementary', { name: 'Layer traffic distribution' });
+    expect(inspector).toHaveTextContent('gpt-4o');
+    expect(inspector).toHaveTextContent('claude-sonnet-4');
+    expect(inspector).toHaveTextContent('25%');
+    expect(inspector).toHaveTextContent('75%');
+    expect(screen.getByRole('img', { name: 'Traffic share' })).toBeInTheDocument();
+  });
 });
 
 function renderVisualizer(overrides: Partial<ComponentProps<typeof ModelGroupMappingVisualizer>> = {}) {
@@ -89,8 +125,8 @@ function renderVisualizer(overrides: Partial<ComponentProps<typeof ModelGroupMap
       labels={labels}
       tierLabel={(tier) => tier === 0 ? 'Primary pool' : `Fallback ${tier}`}
       modelsForEndpoint={(endpointId) => endpoints.find((item) => item.id === endpointId)?.models ?? []}
-      onChangeMapping={vi.fn()}
-      onAddMapping={vi.fn()}
+      onChangeMapping={vi.fn((index: number) => index)}
+      onAddMapping={vi.fn(() => mappings.length)}
       onRemoveMapping={vi.fn()}
       {...overrides}
     />

@@ -12,6 +12,8 @@ import {
   normalizeGroupMappings,
   normalizeUptime,
   removeEndpointModel,
+  routingTierLabel,
+  sortGroupMappingsByTier,
   updateEndpointModel
 } from './domain';
 import type { DriverCatalogItem, Endpoint, EndpointModel, InvocationAttempt, ModelGroup } from './types';
@@ -25,6 +27,16 @@ describe('endpoint domain helpers', () => {
       { endpointId: 4, modelId: 'gpt', tier: 0, weight: 100, sortOrder: 1 },
       { endpointId: 5, modelId: 'gpt-backup', tier: 2, weight: 10000, sortOrder: 2 }
     ]);
+  });
+
+  it('stably sorts mappings by tier and uses consistent Arabic fallback numbering', () => {
+    const tierTwoA = { endpointId: 2, modelId: 'tier-two-a', tier: 2 };
+    const tierZero = { endpointId: 1, modelId: 'primary', tier: 0 };
+    const tierTwoB = { endpointId: 3, modelId: 'tier-two-b', tier: 2 };
+
+    expect(sortGroupMappingsByTier([tierTwoA, tierZero, tierTwoB])).toEqual([tierZero, tierTwoA, tierTwoB]);
+    expect(routingTierLabel(1, 'zh')).toBe('1级备选池');
+    expect(routingTierLabel(2, 'zh')).toBe('2级备选池');
   });
 
   it('honors endpoint capabilities and platform admin access', () => {

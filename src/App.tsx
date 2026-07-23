@@ -126,6 +126,7 @@ import {
   normalizeGroupMappings,
   endpointInsightRows,
   routingTierLabel,
+  sortGroupMappingsByTier,
   uptimeTone
 } from './domain';
 import { createTranslator } from './i18n';
@@ -2614,7 +2615,14 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
           )}
           <div className="mapping-editor">
             <div className="section-title">
-              <strong>{t('groups.mapping')}</strong>
+              <div className="mapping-editor-title-actions">
+                <strong>{t('groups.mapping')}</strong>
+                {groupMappingView === 'list' && (
+                  <button type="button" className="btn secondary small" onClick={() => addGroupMapping(0)}>
+                    <Plus size={14} /> {t('actions.addMapping')}
+                  </button>
+                )}
+              </div>
               <div className="mapping-editor-actions">
                 <Segmented
                   value={groupMappingView}
@@ -2625,11 +2633,6 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                   ]}
                   onChange={(value) => setGroupMappingView(value as GroupMappingView)}
                 />
-                {groupMappingView === 'list' && (
-                  <button type="button" className="btn secondary small" onClick={() => setGroupDraft({ ...groupDraft, mappings: [...groupDraft.mappings, emptyMapping(groupDraft.kind)] })}>
-                    <Plus size={14} /> {t('actions.addMapping')}
-                  </button>
-                )}
               </div>
             </div>
             {groupMappingView === 'list' ? groupDraft.mappings.map((mapping, index) => (
@@ -2680,10 +2683,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                   tierLabel={(tier) => routingTierLabel(tier, locale)}
                   modelsForEndpoint={(endpointId) => compatibleModelsForGroup(endpointId, groupDraft)}
                   onChangeMapping={updateMapping}
-                  onAddMapping={(tier) => setGroupDraft({
-                    ...groupDraft,
-                    mappings: [...groupDraft.mappings, { ...emptyMapping(groupDraft.kind), tier }]
-                  })}
+                  onAddMapping={addGroupMapping}
                   onRemoveMapping={(index) => setGroupDraft({
                     ...groupDraft,
                     mappings: groupDraft.mappings.filter((_, row) => row !== index)
@@ -2700,7 +2700,10 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     deleteModel: t('groups.deleteModel'),
                     modelConfiguration: t('groups.modelConfiguration'),
                     noModelSelected: t('groups.noModelSelected'),
-                    selectModel: t('groups.selectModel')
+                    selectModel: t('groups.selectModel'),
+                    layerTraffic: t('groups.layerTraffic'),
+                    trafficShare: t('groups.trafficShare'),
+                    noTraffic: t('groups.noTraffic')
                   }}
                 />
               )}
@@ -2880,12 +2883,25 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     return null;
   }
 
-  function updateMapping(index: number, patch: Partial<ModelGroupMapping>) {
-    if (!groupDraft) return;
+  function updateMapping(index: number, patch: Partial<ModelGroupMapping>): number {
+    if (!groupDraft) return index;
+    const updatedMapping = { ...groupDraft.mappings[index], ...patch };
+    const mappings = sortGroupMappingsByTier(
+      groupDraft.mappings.map((mapping, row) => (row === index ? updatedMapping : mapping))
+    );
     setGroupDraft({
       ...groupDraft,
-      mappings: groupDraft.mappings.map((mapping, row) => (row === index ? { ...mapping, ...patch } : mapping))
+      mappings
     });
+    return mappings.indexOf(updatedMapping);
+  }
+
+  function addGroupMapping(tier: number): number {
+    if (!groupDraft) return 0;
+    const mapping = { ...emptyMapping(groupDraft.kind), tier };
+    const mappings = sortGroupMappingsByTier([...groupDraft.mappings, mapping]);
+    setGroupDraft({ ...groupDraft, mappings });
+    return mappings.indexOf(mapping);
   }
 
   function compatibleEndpointsForGroup(draft: GroupDraft): Endpoint[] {

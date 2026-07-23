@@ -16,25 +16,28 @@ import type {
 import { IMAGE_PROTOCOL_CONTRACTS } from './imageProtocols';
 
 export function normalizeGroupMappings(mappings: ModelGroupMapping[]): ModelGroupMapping[] {
-  return mappings.map((mapping, index) => {
+  const normalized = mappings.map((mapping) => {
     const tier = Number(mapping.tier);
     const weight = Number(mapping.weight);
     return {
       ...mapping,
       tier: Number.isFinite(tier) && tier >= 0 ? Math.floor(tier) : 0,
-      weight: Number.isFinite(weight) && weight > 0 ? Math.min(10000, Math.floor(weight)) : 100,
-      sortOrder: index + 1
+      weight: Number.isFinite(weight) && weight > 0 ? Math.min(10000, Math.floor(weight)) : 100
     };
   });
+  return sortGroupMappingsByTier(normalized).map((mapping, index) => ({ ...mapping, sortOrder: index + 1 }));
+}
+
+export function sortGroupMappingsByTier<T extends ModelGroupMapping>(mappings: T[]): T[] {
+  return mappings
+    .map((mapping, index) => ({ mapping, index }))
+    .sort((left, right) => (left.mapping.tier ?? 0) - (right.mapping.tier ?? 0) || left.index - right.index)
+    .map(({ mapping }) => mapping);
 }
 
 export function routingTierLabel(tier: number, locale: Locale): string {
   if (tier <= 0) return locale === 'zh' ? '主用池' : 'Primary pool';
-  if (locale === 'zh') {
-    if (tier === 1) return '一级备选池';
-    if (tier === 2) return '二级备选池';
-    return `${tier}级备选池`;
-  }
+  if (locale === 'zh') return `${tier}级备选池`;
   if (tier === 1) return 'Backup pool';
   return `Backup tier ${tier}`;
 }
