@@ -189,8 +189,8 @@ describe('layout contracts', () => {
   });
 
   it('exposes tiered routing controls in the model group modal', () => {
-    expect(appSource).toContain("<SelectField\n                  label={t('groups.endpoint')}");
-    expect(appSource).toContain("<SelectField\n                  label={t('groups.model')}");
+    expect(appSource).toContain("label={t('groups.endpoint')}");
+    expect(appSource).toContain("label={t('groups.model')}");
     expect(appSource).toContain('className="mapping-tier-input"');
     expect(appSource).toContain('className="mapping-weight-input"');
     expect(appSource).toContain('className="icon-button danger mapping-delete-button"');
@@ -200,6 +200,16 @@ describe('layout contracts', () => {
     expect(appSource).toContain("value: 'full', label: t('groups.sidecarConfigFull')");
     expect(appSource).toContain("value: 'reference', label: t('groups.sidecarConfigReference')");
     expect(cssRule('.mapping-delete-button')).toContain('margin-top: 22px');
+  });
+
+  it('keeps list mappings as the default and exposes the visual routing editor', () => {
+    expect(appSource).toContain("useState<GroupMappingView>('list')");
+    expect(appSource).toContain("setGroupMappingView('list')");
+    expect(appSource).toContain("value: 'visual', label: t('groups.visualView'), icon: Workflow");
+    expect(appSource).toContain('<ModelGroupMappingVisualizer');
+    expect(stylesSource).toContain('.mapping-visualizer');
+    expect(stylesSource).toContain('.mapping-model-node.selected');
+    expect(stylesSource).toContain('.mapping-inspector');
   });
 
   it('supports collapsible sidebar without a side search box', () => {

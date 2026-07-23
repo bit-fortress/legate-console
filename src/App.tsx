@@ -19,6 +19,7 @@ import {
   Globe2,
   Info,
   KeyRound,
+  LayoutList,
   Layers,
   LogOut,
   Moon,
@@ -33,6 +34,7 @@ import {
   Upload,
   Users,
   UserCog,
+  Workflow,
   X
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -137,6 +139,7 @@ import EndpointsPage, { type EndpointGroupListItem } from './EndpointsPage';
 import EndpointEditor, { EndpointDetail, type EndpointEditorSubmission } from './EndpointEditor';
 import TextProtocolSelector from './TextProtocolSelector';
 import ImageProtocolSelector from './ImageProtocolSelector';
+import { ModelGroupMappingVisualizer } from './ModelGroupMappingVisualizer';
 import { TEXT_PROTOCOL_CONTRACTS, textProtocolDisplayName } from './textProtocols';
 import { IMAGE_PROTOCOL_CONTRACTS, imageProtocolDisplayName } from './imageProtocols';
 import { AnalyticsAttemptTable, AnalyticsCompletenessBanner, AnalyticsRequestTable, AnalyticsSummaryView, formatNanoUSD } from './AnalyticsViews';
@@ -152,6 +155,7 @@ type AnalyticsRangeSelection =
 type SidecarView = 'instances' | 'tokens';
 type DriverView = 'builtin' | 'profiles';
 type DriverKindFilter = 'all' | ModelKind;
+type GroupMappingView = 'list' | 'visual';
 type ModalName = 'endpoint' | 'endpointDetail' | 'endpointGroup' | 'driverUpload' | 'driverDetail' | 'group' | 'key' | 'sidecar' | 'workspace' | 'members' | 'token' | 'delete' | null;
 type DeleteTarget = {
   kind: 'endpoint' | 'endpointGroup' | 'driverProfile' | 'group' | 'key' | 'sidecar';
@@ -387,6 +391,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
   const [driverAliasDraft, setDriverAliasDraft] = useState('');
   const [selectedEndpointDetail, setSelectedEndpointDetail] = useState<Endpoint | null>(null);
   const [groupDraft, setGroupDraft] = useState<GroupDraft | null>(null);
+  const [groupMappingView, setGroupMappingView] = useState<GroupMappingView>('list');
   const [keyDraft, setKeyDraft] = useState<APIKeyDraft | null>(null);
   const [sidecarDraft, setSidecarDraft] = useState<SidecarDraft | null>(null);
   const [workspaceDraft, setWorkspaceDraft] = useState<WorkspaceDraft | null>(null);
@@ -852,6 +857,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
   function openGroupModal(group?: ModelGroup) {
     if (!canWriteGroups) return;
     const kind = group?.kind ?? 'text';
+    setGroupMappingView('list');
     setGroupDraft({
       id: group?.id,
       name: group?.name ?? '',
@@ -2609,51 +2615,95 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
           <div className="mapping-editor">
             <div className="section-title">
               <strong>{t('groups.mapping')}</strong>
-              <button type="button" className="btn secondary small" onClick={() => setGroupDraft({ ...groupDraft, mappings: [...groupDraft.mappings, emptyMapping(groupDraft.kind)] })}>
-                <Plus size={14} /> {t('actions.addMapping')}
-              </button>
-            </div>
-            {groupDraft.mappings.map((mapping, index) => (
-              <div className="mapping-row" key={index}>
-                <SelectField
-                  label={t('groups.endpoint')}
-                  value={mapping.endpointId ? String(mapping.endpointId) : ''}
-                  placeholder={t('groups.endpoint')}
-                  onChange={(value) => updateMapping(index, { endpointId: value ? Number(value) : 0, modelId: '' })}
-                  options={compatibleEndpointsForGroup(groupDraft).map((endpoint) => ({ value: String(endpoint.id), label: endpoint.name }))}
+              <div className="mapping-editor-actions">
+                <Segmented
+                  value={groupMappingView}
+                  ariaLabel={t('groups.viewMode')}
+                  options={[
+                    { value: 'list', label: t('groups.listView'), icon: LayoutList },
+                    { value: 'visual', label: t('groups.visualView'), icon: Workflow }
+                  ]}
+                  onChange={(value) => setGroupMappingView(value as GroupMappingView)}
                 />
-                <SelectField
-                  label={t('groups.model')}
-                  value={mapping.modelId}
-                  placeholder={t('groups.model')}
-                  onChange={(value) => updateMapping(index, { modelId: value })}
-                  options={compatibleModelsForGroup(mapping.endpointId, groupDraft).map((model) => ({ value: model.id, label: model.id }))}
-                />
-                <TextField
-                  className="mapping-tier-input"
-                  label={t('groups.tier')}
-                  type="number"
-                  value={String(mapping.tier ?? 0)}
-                  onChange={(value) => updateMapping(index, { tier: Math.max(0, Math.floor(Number(value) || 0)) })}
-                />
-                <TextField
-                  className="mapping-weight-input"
-                  label={t('groups.weight')}
-                  type="number"
-                  value={String(mapping.weight ?? 100)}
-                  onChange={(value) => updateMapping(index, { weight: Math.min(10000, Math.max(1, Math.floor(Number(value) || 100))) })}
-                />
-                <button
-                  type="button"
-                  className="icon-button danger mapping-delete-button"
-                  aria-label={`${t('actions.delete')} ${t('groups.mapping')} ${index + 1}`}
-                  title={`${t('actions.delete')} ${t('groups.mapping')} ${index + 1}`}
-                  onClick={() => setGroupDraft({ ...groupDraft, mappings: groupDraft.mappings.filter((_, row) => row !== index) })}
-                >
-                  <Trash2 size={15} />
-                </button>
+                {groupMappingView === 'list' && (
+                  <button type="button" className="btn secondary small" onClick={() => setGroupDraft({ ...groupDraft, mappings: [...groupDraft.mappings, emptyMapping(groupDraft.kind)] })}>
+                    <Plus size={14} /> {t('actions.addMapping')}
+                  </button>
+                )}
               </div>
-            ))}
+            </div>
+            {groupMappingView === 'list' ? groupDraft.mappings.map((mapping, index) => (
+                <div className="mapping-row" key={index}>
+                  <SelectField
+                    label={t('groups.endpoint')}
+                    value={mapping.endpointId ? String(mapping.endpointId) : ''}
+                    placeholder={t('groups.endpoint')}
+                    onChange={(value) => updateMapping(index, { endpointId: value ? Number(value) : 0, modelId: '' })}
+                    options={compatibleEndpointsForGroup(groupDraft).map((endpoint) => ({ value: String(endpoint.id), label: endpoint.name }))}
+                  />
+                  <SelectField
+                    label={t('groups.model')}
+                    value={mapping.modelId}
+                    placeholder={t('groups.model')}
+                    onChange={(value) => updateMapping(index, { modelId: value })}
+                    options={compatibleModelsForGroup(mapping.endpointId, groupDraft).map((model) => ({ value: model.id, label: model.id }))}
+                  />
+                  <TextField
+                    className="mapping-tier-input"
+                    label={t('groups.tier')}
+                    type="number"
+                    value={String(mapping.tier ?? 0)}
+                    onChange={(value) => updateMapping(index, { tier: Math.max(0, Math.floor(Number(value) || 0)) })}
+                  />
+                  <TextField
+                    className="mapping-weight-input"
+                    label={t('groups.weight')}
+                    type="number"
+                    value={String(mapping.weight ?? 100)}
+                    onChange={(value) => updateMapping(index, { weight: Math.min(10000, Math.max(1, Math.floor(Number(value) || 100))) })}
+                  />
+                  <button
+                    type="button"
+                    className="icon-button danger mapping-delete-button"
+                    aria-label={`${t('actions.delete')} ${t('groups.mapping')} ${index + 1}`}
+                    title={`${t('actions.delete')} ${t('groups.mapping')} ${index + 1}`}
+                    onClick={() => setGroupDraft({ ...groupDraft, mappings: groupDraft.mappings.filter((_, row) => row !== index) })}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              )) : (
+                <ModelGroupMappingVisualizer
+                  groupName={groupDraft.name}
+                  mappings={groupDraft.mappings}
+                  endpoints={compatibleEndpointsForGroup(groupDraft)}
+                  tierLabel={(tier) => routingTierLabel(tier, locale)}
+                  modelsForEndpoint={(endpointId) => compatibleModelsForGroup(endpointId, groupDraft)}
+                  onChangeMapping={updateMapping}
+                  onAddMapping={(tier) => setGroupDraft({
+                    ...groupDraft,
+                    mappings: [...groupDraft.mappings, { ...emptyMapping(groupDraft.kind), tier }]
+                  })}
+                  onRemoveMapping={(index) => setGroupDraft({
+                    ...groupDraft,
+                    mappings: groupDraft.mappings.filter((_, row) => row !== index)
+                  })}
+                  labels={{
+                    start: t('groups.routeStart'),
+                    layer: t('groups.layer'),
+                    model: t('groups.model'),
+                    provider: t('groups.provider'),
+                    tier: t('groups.tier'),
+                    weight: t('groups.weight'),
+                    addModel: t('groups.addModel'),
+                    addFallback: t('groups.addFallback'),
+                    deleteModel: t('groups.deleteModel'),
+                    modelConfiguration: t('groups.modelConfiguration'),
+                    noModelSelected: t('groups.noModelSelected'),
+                    selectModel: t('groups.selectModel')
+                  }}
+                />
+              )}
           </div>
           {renderIncompatibleModels(groupDraft)}
           <ModalActions cancelLabel={t('actions.cancel')} saveLabel={t('actions.save')} onCancel={() => setModal(null)} onSave={() => void saveGroupDraft()} />
