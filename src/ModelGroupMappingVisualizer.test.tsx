@@ -25,7 +25,8 @@ const labels: ModelGroupMappingVisualizerLabels = {
   selectModel: 'Select model',
   layerTraffic: 'Layer traffic distribution',
   trafficShare: 'Traffic share',
-  noTraffic: 'No model traffic in this layer'
+  noTraffic: 'No model traffic in this layer',
+  pendingApply: 'Pending'
 };
 
 const endpoints = [
@@ -65,10 +66,25 @@ describe('ModelGroupMappingVisualizer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Model provider' }));
     await user.click(screen.getByRole('option', { name: 'Anthropic' }));
-    expect(onChangeMapping).toHaveBeenCalledWith(0, { endpointId: 2, modelId: '' });
+    expect(onChangeMapping).toHaveBeenCalledWith(0, { endpointId: 2, modelId: '' }, true);
 
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Weight' }), { target: { value: '250' } });
-    expect(onChangeMapping).toHaveBeenLastCalledWith(0, { weight: 250 });
+    expect(onChangeMapping).toHaveBeenLastCalledWith(0, { weight: 250 }, true);
+  });
+
+  it('defers tier reordering until the tier input loses focus', async () => {
+    const user = userEvent.setup();
+    const onChangeMapping = vi.fn((index: number) => index);
+    renderVisualizer({ onChangeMapping });
+
+    await user.click(screen.getByRole('button', { name: 'Model gpt-4o' }));
+    const tierInput = screen.getByRole('spinbutton', { name: 'Tier' });
+    fireEvent.change(tierInput, { target: { value: '2' } });
+    expect(onChangeMapping).not.toHaveBeenCalled();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+
+    fireEvent.blur(tierInput);
+    expect(onChangeMapping).toHaveBeenLastCalledWith(0, { tier: 2 }, true);
   });
 
   it('deletes the selected model node', async () => {

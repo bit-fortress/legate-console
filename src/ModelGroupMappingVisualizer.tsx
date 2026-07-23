@@ -19,6 +19,7 @@ export interface ModelGroupMappingVisualizerLabels {
   layerTraffic: string;
   trafficShare: string;
   noTraffic: string;
+  pendingApply: string;
 }
 
 interface ModelGroupMappingVisualizerProps {
@@ -28,7 +29,7 @@ interface ModelGroupMappingVisualizerProps {
   labels: ModelGroupMappingVisualizerLabels;
   tierLabel: (tier: number) => string;
   modelsForEndpoint: (endpointId: number) => EndpointModel[];
-  onChangeMapping: (index: number, patch: Partial<ModelGroupMapping>) => number;
+  onChangeMapping: (index: number, patch: Partial<ModelGroupMapping>, reorder: boolean) => number;
   onAddMapping: (tier: number) => number;
   onRemoveMapping: (index: number) => void;
 }
@@ -52,6 +53,7 @@ export function ModelGroupMappingVisualizer({
   onRemoveMapping
 }: ModelGroupMappingVisualizerProps) {
   const [selection, setSelection] = useState<VisualizerSelection>(null);
+  const [tierDraft, setTierDraft] = useState<number | null>(null);
   const tiers = Array.from(new Set([0, ...mappings.map((mapping) => mapping.tier ?? 0)]))
     .sort((left, right) => left - right);
   const selectedIndex = selection?.type === 'mapping' ? selection.index : null;
@@ -60,24 +62,44 @@ export function ModelGroupMappingVisualizer({
   const maxTier = tiers[tiers.length - 1] ?? 0;
 
   useEffect(() => {
-    if (selectedIndex != null && selectedIndex >= mappings.length) setSelection(null);
-    if (selectedTier != null && !tiers.includes(selectedTier)) setSelection(null);
+    if (selectedIndex != null && selectedIndex >= mappings.length) {
+      setTierDraft(null);
+      setSelection(null);
+    }
+    if (selectedTier != null && !tiers.includes(selectedTier)) {
+      setTierDraft(null);
+      setSelection(null);
+    }
   }, [mappings.length, selectedIndex, selectedTier, tiers]);
 
   function addMapping(tier: number) {
     const nextIndex = onAddMapping(tier);
+    setTierDraft(null);
     setSelection({ type: 'mapping', index: nextIndex });
   }
 
   function changeSelectedMapping(patch: Partial<ModelGroupMapping>) {
     if (selectedIndex == null) return;
-    const nextIndex = onChangeMapping(selectedIndex, patch);
+    const nextIndex = onChangeMapping(selectedIndex, patch, true);
     setSelection({ type: 'mapping', index: nextIndex });
+  }
+
+  function selectMapping(index: number) {
+    setTierDraft(null);
+    setSelection({ type: 'mapping', index });
+  }
+
+  function commitTierDraft() {
+    if (selectedIndex == null || tierDraft == null) return;
+    const nextIndex = onChangeMapping(selectedIndex, { tier: tierDraft }, true);
+    setSelection({ type: 'mapping', index: nextIndex });
+    setTierDraft(null);
   }
 
   function removeSelectedMapping() {
     if (selectedIndex == null) return;
     onRemoveMapping(selectedIndex);
+    setTierDraft(null);
     setSelection(null);
   }
 
@@ -89,6 +111,7 @@ export function ModelGroupMappingVisualizer({
         onClick={(event) => {
           const target = event.target as HTMLElement;
           if (target.closest('.mapping-tier-panel, .mapping-start-node, button')) return;
+          setTierDraft(null);
           setSelection(null);
         }}
       >
@@ -111,6 +134,7 @@ export function ModelGroupMappingVisualizer({
                 aria-label={`${labels.layer} ${tier + 1}`}
                 onClick={(event) => {
                   if ((event.target as HTMLElement).closest('button')) return;
+                  setTierDraft(null);
                   setSelection({ type: 'tier', tier });
                 }}
               >
@@ -119,7 +143,10 @@ export function ModelGroupMappingVisualizer({
                   className="mapping-tier-header"
                   aria-label={`${labels.layer} ${tier + 1} ${labels.layerTraffic}`}
                   aria-pressed={selectedTier === tier}
-                  onClick={() => setSelection({ type: 'tier', tier })}
+                  onClick={() => {
+                    setTierDraft(null);
+                    setSelection({ type: 'tier', tier });
+                  }}
                 >
                   <span className="mapping-layer-index">{labels.layer} {tier + 1}</span>
                   <strong>{tierLabel(tierIndex)}</strong>
@@ -136,7 +163,7 @@ export function ModelGroupMappingVisualizer({
                         aria-pressed={selected}
                         aria-label={`${labels.model} ${mapping.modelId || index + 1}`}
                         key={mapping.id ?? index}
-                        onClick={() => setSelection({ type: 'mapping', index })}
+                        onClick={() => selectMapping(index)}
                       >
                         <span className="mapping-node-label"><Box size={12} /> {labels.model}</span>
                         <span className="mapping-node-body">
@@ -201,13 +228,20 @@ export function ModelGroupMappingVisualizer({
             />
             <div className="mapping-inspector-numbers">
               <label className="field">
-                <span>{labels.tier}</span>
+                <span className="mapping-inspector-field-label">
+                  <span>{labels.tier}</span>
+                  {tierDraft != null && <small>{labels.pendingApply}</small>}
+                </span>
                 <input
                   aria-label={labels.tier}
                   type="number"
                   min="0"
-                  value={selectedMapping.tier ?? 0}
-                  onChange={(event) => changeSelectedMapping({ tier: Math.max(0, Math.floor(Number(event.target.value) || 0)) })}
+                  value={tierDraft ?? selectedMapping.tier ?? 0}
+                  onChange={(event) => setTierDraft(Math.max(0, Math.floor(Number(event.target.value) || 0)))}
+                  onBlur={commitTierDraft}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.currentTarget.blur();
+                  }}
                 />
               </label>
               <label className="field">

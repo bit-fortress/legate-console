@@ -393,6 +393,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
   const [selectedEndpointDetail, setSelectedEndpointDetail] = useState<Endpoint | null>(null);
   const [groupDraft, setGroupDraft] = useState<GroupDraft | null>(null);
   const [groupMappingView, setGroupMappingView] = useState<GroupMappingView>('list');
+  const [pendingMappingTierIndex, setPendingMappingTierIndex] = useState<number | null>(null);
   const [keyDraft, setKeyDraft] = useState<APIKeyDraft | null>(null);
   const [sidecarDraft, setSidecarDraft] = useState<SidecarDraft | null>(null);
   const [workspaceDraft, setWorkspaceDraft] = useState<WorkspaceDraft | null>(null);
@@ -859,6 +860,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     if (!canWriteGroups) return;
     const kind = group?.kind ?? 'text';
     setGroupMappingView('list');
+    setPendingMappingTierIndex(null);
     setGroupDraft({
       id: group?.id,
       name: group?.name ?? '',
@@ -2626,13 +2628,16 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                   ]}
                   onChange={(value) => setGroupMappingView(value as GroupMappingView)}
                 />
-                {groupMappingView === 'list' && (
-                  <button type="button" className="btn secondary small" onClick={() => addGroupMapping(0)}>
-                    <Plus size={14} /> {t('actions.addMapping')}
-                  </button>
-                )}
               </div>
             </div>
+            {groupMappingView === 'list' && (
+              <div className="mapping-list-toolbar" role="toolbar" aria-label={t('groups.mappingList')}>
+                <span>{t('groups.mappingCount').replace('{count}', String(groupDraft.mappings.length))}</span>
+                <button type="button" className="btn secondary small" onClick={() => addGroupMapping(0)}>
+                  <Plus size={14} /> {t('actions.addMapping')}
+                </button>
+              </div>
+            )}
             {groupMappingView === 'list' ? groupDraft.mappings.map((mapping, index) => (
                 <div className="mapping-row" key={index}>
                   <SelectField
@@ -2654,7 +2659,15 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     label={t('groups.tier')}
                     type="number"
                     value={String(mapping.tier ?? 0)}
-                    onChange={(value) => updateMapping(index, { tier: Math.max(0, Math.floor(Number(value) || 0)) })}
+                    status={pendingMappingTierIndex === index ? t('groups.pendingApply') : undefined}
+                    onChange={(value) => {
+                      setPendingMappingTierIndex(index);
+                      updateMapping(index, { tier: Math.max(0, Math.floor(Number(value) || 0)) }, false);
+                    }}
+                    onBlur={() => {
+                      updateMapping(index, {});
+                      setPendingMappingTierIndex(null);
+                    }}
                   />
                   <TextField
                     className="mapping-weight-input"
@@ -2701,7 +2714,8 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     selectModel: t('groups.selectModel'),
                     layerTraffic: t('groups.layerTraffic'),
                     trafficShare: t('groups.trafficShare'),
-                    noTraffic: t('groups.noTraffic')
+                    noTraffic: t('groups.noTraffic'),
+                    pendingApply: t('groups.pendingApply')
                   }}
                 />
               )}
@@ -2881,12 +2895,11 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     return null;
   }
 
-  function updateMapping(index: number, patch: Partial<ModelGroupMapping>): number {
+  function updateMapping(index: number, patch: Partial<ModelGroupMapping>, reorder = true): number {
     if (!groupDraft) return index;
     const updatedMapping = { ...groupDraft.mappings[index], ...patch };
-    const mappings = sortGroupMappingsByTier(
-      groupDraft.mappings.map((mapping, row) => (row === index ? updatedMapping : mapping))
-    );
+    const updatedMappings = groupDraft.mappings.map((mapping, row) => (row === index ? updatedMapping : mapping));
+    const mappings = reorder ? sortGroupMappingsByTier(updatedMappings) : updatedMappings;
     setGroupDraft({
       ...groupDraft,
       mappings
@@ -3317,19 +3330,37 @@ function TextField({
   label,
   value,
   onChange,
+  onBlur,
+  status,
   type = 'text',
   className
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
+  status?: string;
   type?: string;
   className?: string;
 }) {
   return (
     <div className={className ? `field ${className}` : 'field'}>
-      <span>{label}</span>
-      <input aria-label={label} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      {status ? (
+        <span className="field-label-row">
+          <span>{label}</span>
+          <small>{status}</small>
+        </span>
+      ) : <span>{label}</span>}
+      <input
+        aria-label={label}
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && onBlur) event.currentTarget.blur();
+        }}
+      />
     </div>
   );
 }

@@ -217,6 +217,31 @@ describe('App endpoint permissions and flows', () => {
     expect(within(dialog).getByLabelText('Anthropic Messages')).toBeDisabled();
   });
 
+  it('keeps mapping creation in a list toolbar and reorders tiers only after blur', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/groups');
+    mockWorkspace(['model_groups:read', 'model_groups:write', 'endpoints:read', 'endpoint_drivers:read']);
+    renderApp();
+
+    await user.click(await screen.findByRole('button', { name: '添加模型组' }));
+    const dialog = screen.getByRole('dialog', { name: '添加模型组' });
+    const mappingToolbar = within(dialog).getByRole('toolbar', { name: '映射列表' });
+    expect(within(mappingToolbar).getByText('1 条映射')).toBeInTheDocument();
+
+    await user.click(within(mappingToolbar).getByRole('button', { name: '添加映射' }));
+    expect(within(mappingToolbar).getByText('2 条映射')).toBeInTheDocument();
+    let tierInputs = within(dialog).getAllByRole('spinbutton', { name: '层级' });
+
+    await user.clear(tierInputs[0]);
+    await user.type(tierInputs[0], '2');
+    tierInputs = within(dialog).getAllByRole('spinbutton', { name: '层级' });
+    expect(tierInputs.map((input) => (input as HTMLInputElement).value)).toEqual(['2', '0']);
+
+    await user.tab();
+    tierInputs = within(dialog).getAllByRole('spinbutton', { name: '层级' });
+    expect(tierInputs.map((input) => (input as HTMLInputElement).value)).toEqual(['0', '2']);
+  });
+
   it('links exposed image protocols with compatible endpoint choices in both directions', async () => {
     const user = userEvent.setup();
     const generationEndpoint: Endpoint = {
