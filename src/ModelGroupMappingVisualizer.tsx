@@ -83,7 +83,15 @@ export function ModelGroupMappingVisualizer({
 
   return (
     <div className="mapping-visualizer">
-      <div className="mapping-canvas" data-testid="mapping-canvas">
+      <div
+        className="mapping-canvas"
+        data-testid="mapping-canvas"
+        onClick={(event) => {
+          const target = event.target as HTMLElement;
+          if (target.closest('.mapping-tier-panel, .mapping-start-node, button')) return;
+          setSelection(null);
+        }}
+      >
         <div className="mapping-start-node">
           <span><Zap size={13} fill="currentColor" /> {labels.start}</span>
           <strong>{groupName || labels.start}</strong>

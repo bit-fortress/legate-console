@@ -3472,20 +3472,18 @@ a {
 .mapping-editor-actions {
   display: flex;
   min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: stretch;
+  flex-direction: column;
   gap: 8px;
-}
-
-.mapping-editor-title-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 10px;
 }
 
 .mapping-editor-actions .segmented {
   flex: 0 0 auto;
+}
+
+.mapping-editor-actions > .btn {
+  width: 100%;
+  justify-content: center;
 }
 
 .mapping-visualizer {
@@ -4800,10 +4798,6 @@ a {
   .mapping-editor .section-title {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .mapping-editor-title-actions {
-    justify-content: space-between;
   }
 
   .mapping-editor-actions .segmented,

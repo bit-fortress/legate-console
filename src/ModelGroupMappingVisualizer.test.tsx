@@ -114,6 +114,22 @@ describe('ModelGroupMappingVisualizer', () => {
     expect(inspector).toHaveTextContent('75%');
     expect(screen.getByRole('img', { name: 'Traffic share' })).toBeInTheDocument();
   });
+
+  it('clears model and layer selections when the canvas background is clicked', async () => {
+    const user = userEvent.setup();
+    renderVisualizer();
+    const canvas = screen.getByTestId('mapping-canvas');
+
+    await user.click(screen.getByRole('button', { name: 'Model gpt-4o' }));
+    expect(screen.getByRole('complementary', { name: 'Model configuration' })).toHaveTextContent('OpenAI');
+    await user.click(canvas);
+    expect(screen.getByRole('complementary', { name: 'Model configuration' })).toHaveTextContent('No model selected');
+
+    await user.click(screen.getByRole('button', { name: 'Layer 1 Layer traffic distribution' }));
+    expect(screen.getByRole('complementary', { name: 'Layer traffic distribution' })).toBeInTheDocument();
+    await user.click(canvas);
+    expect(screen.getByRole('complementary', { name: 'Model configuration' })).toHaveTextContent('No model selected');
+  });
 });
 
 function renderVisualizer(overrides: Partial<ComponentProps<typeof ModelGroupMappingVisualizer>> = {}) {

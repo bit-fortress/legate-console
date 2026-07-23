@@ -2615,14 +2615,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
           )}
           <div className="mapping-editor">
             <div className="section-title">
-              <div className="mapping-editor-title-actions">
-                <strong>{t('groups.mapping')}</strong>
-                {groupMappingView === 'list' && (
-                  <button type="button" className="btn secondary small" onClick={() => addGroupMapping(0)}>
-                    <Plus size={14} /> {t('actions.addMapping')}
-                  </button>
-                )}
-              </div>
+              <strong>{t('groups.mapping')}</strong>
               <div className="mapping-editor-actions">
                 <Segmented
                   value={groupMappingView}
@@ -2633,6 +2626,11 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                   ]}
                   onChange={(value) => setGroupMappingView(value as GroupMappingView)}
                 />
+                {groupMappingView === 'list' && (
+                  <button type="button" className="btn secondary small" onClick={() => addGroupMapping(0)}>
+                    <Plus size={14} /> {t('actions.addMapping')}
+                  </button>
+                )}
               </div>
             </div>
             {groupMappingView === 'list' ? groupDraft.mappings.map((mapping, index) => (
