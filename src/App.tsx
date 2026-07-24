@@ -1473,7 +1473,9 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     const healthClass = health === 'ok' ? 'good' : 'danger';
     return (
       <>
-        <PageIntro title={t('overview.title')} subtitle={t('overview.subtitle')} />
+        <PageIntro title={t('overview.title')} subtitle={t('overview.subtitle')}>
+          {canReadAnalytics && <TimeRangePicker value={analyticsRange} onChange={setAnalyticsRange} t={t} />}
+        </PageIntro>
         {canReadAnalytics && <AnalyticsCompletenessBanner completeness={summary.completeness} t={t} />}
         {canReadAnalytics && (
           <div className="metrics-grid">
@@ -3830,7 +3832,8 @@ function toDateTimeLocalValue(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   const hour = String(date.getHours()).padStart(2, '0');
   const minute = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hour}:${minute}`;
+  const second = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 }
 
 function fromDateTimeLocalValue(value: string): Date | null {
@@ -3847,7 +3850,8 @@ function formatRangeDateTime(value: string | Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   const hour = String(date.getHours()).padStart(2, '0');
   const minute = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hour}:${minute}`;
+  const second = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 }
 
 function analyticsRangeLabel(selection: AnalyticsRangeSelection, t: (key: string) => string): string {
@@ -3984,6 +3988,7 @@ function TimeRangePicker({
               <input
                 aria-label={t('analytics.rangeFrom')}
                 type="datetime-local"
+                step="1"
                 value={draftFrom}
                 onChange={(event) => {
                   setDraftFrom(event.target.value);
@@ -3996,6 +4001,7 @@ function TimeRangePicker({
               <input
                 aria-label={t('analytics.rangeTo')}
                 type="datetime-local"
+                step="1"
                 value={draftTo}
                 onChange={(event) => {
                   setDraftTo(event.target.value);

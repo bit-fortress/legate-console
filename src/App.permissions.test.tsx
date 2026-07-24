@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -458,6 +458,41 @@ describe('App endpoint permissions and flows', () => {
     await screen.findByRole('heading', { name: '系统概览' });
     await waitFor(() => expect(api.listInvocationRequests).toHaveBeenCalledWith(expect.objectContaining({ role: 'origin', limit: 8 })));
     expect(api.listInvocationAttempts).not.toHaveBeenCalled();
+  });
+
+  it('applies a second-precision time range to Overview analytics', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/');
+    mockWorkspace(['analytics:read']);
+    renderApp();
+
+    await screen.findByRole('heading', { name: '系统概览' });
+    await user.click(screen.getByRole('button', { name: '最近 15 分钟' }));
+
+    const fromInput = screen.getByLabelText('开始时间');
+    const toInput = screen.getByLabelText('结束时间');
+    expect(fromInput).toHaveAttribute('step', '1');
+    expect(toInput).toHaveAttribute('step', '1');
+
+    const from = '2026-07-24T10:20:30';
+    const to = '2026-07-24T11:21:31';
+    fireEvent.change(fromInput, { target: { value: from } });
+    fireEvent.change(toInput, { target: { value: to } });
+    vi.mocked(api.getAnalyticsSummary).mockClear();
+    vi.mocked(api.listInvocationRequests).mockClear();
+    await user.click(screen.getByRole('button', { name: '应用时间范围' }));
+
+    const expectedRange = {
+      from: new Date(from).toISOString(),
+      to: new Date(to).toISOString()
+    };
+    await waitFor(() => expect(api.getAnalyticsSummary).toHaveBeenCalledWith(expectedRange));
+    expect(api.listInvocationRequests).toHaveBeenCalledWith({
+      ...expectedRange,
+      limit: 8,
+      role: 'origin'
+    });
+    expect(screen.getByRole('button', { name: /2026-07-24 10:20:30/ })).toHaveTextContent('2026-07-24 11:21:31');
   });
 
   it('filters Activity on the server without filtering Summary or Endpoint insights', async () => {
