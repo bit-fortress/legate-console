@@ -98,8 +98,11 @@ describe('layout contracts', () => {
     expect(appSource).toContain('data-testid="settings-menu"');
     expect(appSource).toContain('testId="theme-toggle"');
     expect(appSource).toContain('testId="locale-toggle"');
+    expect(appSource).toContain("{ value: 'system', label: t('settings.system'), icon: Monitor }");
     expect(appSource).toContain('setTheme(value as ThemeName)');
     expect(appSource).toContain('setLocale(value as Locale)');
+    expect(dictionaryFor('zh')['settings.system']).toBe('跟随系统');
+    expect(dictionaryFor('en')['settings.system']).toBe('System');
   });
 
   it('defines coordinated dark and light theme tokens', () => {
@@ -170,6 +173,15 @@ describe('layout contracts', () => {
     expect(stylesSource).not.toContain('.global-search');
     expect(cssRule('.topbar')).toContain('justify-content: flex-end');
     expect(cssRule('.topbar')).toContain('min-height: 48px');
+  });
+
+  it('places refresh immediately before the top-aligned analytics time range', () => {
+    const topbarStart = appSource.indexOf('<header className="topbar">');
+    const topbarEnd = appSource.indexOf('</header>', topbarStart);
+    const topbarSource = appSource.slice(topbarStart, topbarEnd);
+    expect(topbarSource).not.toContain('<RefreshCw');
+    expect(appSource).toMatch(/className="analytics-page-intro"[\s\S]*?t\('actions\.refresh'\)[\s\S]*?<TimeRangePicker/);
+    expect(cssRule('.analytics-page-intro')).toContain('align-items: flex-start');
   });
 
   it('places workspace switching in the bottom-left switcher', () => {

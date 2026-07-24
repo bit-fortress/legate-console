@@ -986,6 +986,10 @@ a {
   min-height: 32px;
 }
 
+.analytics-page-intro {
+  align-items: flex-start;
+}
+
 .time-range-picker {
   position: relative;
   min-width: 0;

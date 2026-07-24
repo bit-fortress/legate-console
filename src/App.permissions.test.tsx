@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -132,6 +132,38 @@ describe('App endpoint permissions and flows', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('follows live system theme changes when the system preference is selected', async () => {
+    const user = userEvent.setup();
+    let dark = false;
+    let changeListener: (() => void) | undefined;
+    const mediaQuery = {
+      get matches() {
+        return dark;
+      },
+      addEventListener: vi.fn((_event: string, listener: () => void) => {
+        changeListener = listener;
+      }),
+      removeEventListener: vi.fn()
+    };
+    vi.stubGlobal('matchMedia', vi.fn(() => mediaQuery));
+    localStorage.setItem('legate.theme', 'light');
+    mockWorkspace([]);
+
+    renderApp();
+    await user.click(screen.getByRole('button', { name: '个人设置' }));
+    await user.click(within(screen.getByTestId('theme-toggle')).getByRole('button', { name: '跟随系统' }));
+
+    expect(localStorage.getItem('legate.theme')).toBe('system');
+    expect(document.documentElement.dataset.theme).toBe('light');
+
+    act(() => {
+      dark = true;
+      changeListener?.();
+    });
+    expect(document.documentElement.dataset.theme).toBe('dark');
   });
 
   it('creates endpoints only from a group and locks the selected group', async () => {

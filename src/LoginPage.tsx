@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Globe2, LogIn, Moon, RefreshCw, Sun } from 'lucide-react';
 import type { AdminAuthError, PublicAdminAuthConfig } from './auth';
 import { createTranslator } from './i18n';
-import { applyTheme, initialLocale, initialTheme, persistLocale, persistTheme } from './theme';
+import { applyTheme, initialLocale, initialTheme, persistLocale, persistTheme, subscribeToSystemTheme } from './theme';
 import type { Locale, ThemeName } from './types';
 import legateLogo from './assets/legate-transparent.png';
 
@@ -27,6 +27,9 @@ export default function LoginPage({ config, returnTo, authError, status = 'ready
     applyTheme(theme, locale);
     persistTheme(theme);
     persistLocale(locale);
+    if (theme === 'system') {
+      return subscribeToSystemTheme(() => applyTheme(theme, locale));
+    }
   }, [locale, theme]);
 
   async function submitDevToken(event: FormEvent<HTMLFormElement>) {

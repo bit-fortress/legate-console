@@ -22,6 +22,7 @@ import {
   LayoutList,
   Layers,
   LogOut,
+  Monitor,
   Moon,
   MoreHorizontal,
   PanelLeftClose,
@@ -130,7 +131,7 @@ import {
   uptimeTone
 } from './domain';
 import { createTranslator } from './i18n';
-import { applyTheme, initialLocale, initialTheme, persistLocale, persistTheme } from './theme';
+import { applyTheme, initialLocale, initialTheme, persistLocale, persistTheme, subscribeToSystemTheme } from './theme';
 import type { AdminPrincipal, PublicAdminAuthConfig } from './auth';
 import legateLogo from './assets/legate-transparent.png';
 import WorkspaceMembersPanel from './WorkspaceMembersPanel';
@@ -429,6 +430,9 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     applyTheme(theme, locale);
     persistTheme(theme);
     persistLocale(locale);
+    if (theme === 'system') {
+      return subscribeToSystemTheme(() => applyTheme(theme, locale));
+    }
   }, [theme, locale]);
 
   useEffect(() => {
@@ -1355,9 +1359,6 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       <main className="workspace">
         <header className="topbar">
           <div className="top-actions">
-            <button type="button" className="icon-button" onClick={() => void refresh()} aria-label={t('actions.refresh')} title={t('actions.refresh')}>
-              <RefreshCw size={18} className={loading ? 'spin' : ''} />
-            </button>
             <div className="settings-wrap">
               <button
                 type="button"
@@ -1384,6 +1385,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     <Segmented
                       value={theme}
                       options={[
+                        { value: 'system', label: t('settings.system'), icon: Monitor },
                         { value: 'light', label: t('settings.light'), icon: Sun },
                         { value: 'dark', label: t('settings.dark'), icon: Moon }
                       ]}
@@ -1473,8 +1475,15 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     const healthClass = health === 'ok' ? 'good' : 'danger';
     return (
       <>
-        <PageIntro title={t('overview.title')} subtitle={t('overview.subtitle')}>
-          {canReadAnalytics && <TimeRangePicker value={analyticsRange} onChange={setAnalyticsRange} t={t} />}
+        <PageIntro title={t('overview.title')} subtitle={t('overview.subtitle')} className="analytics-page-intro">
+          {canReadAnalytics && (
+            <>
+              <button type="button" className="icon-button" onClick={() => void refresh()} aria-label={t('actions.refresh')} title={t('actions.refresh')}>
+                <RefreshCw size={18} className={loading ? 'spin' : ''} />
+              </button>
+              <TimeRangePicker value={analyticsRange} onChange={setAnalyticsRange} t={t} />
+            </>
+          )}
         </PageIntro>
         {canReadAnalytics && <AnalyticsCompletenessBanner completeness={summary.completeness} t={t} />}
         {canReadAnalytics && (
@@ -2058,7 +2067,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       : ['activity'];
     return (
       <>
-        <PageIntro title={t('analytics.title')} subtitle={t('analytics.subtitle')}>
+        <PageIntro title={t('analytics.title')} subtitle={t('analytics.subtitle')} className="analytics-page-intro">
           {canReadEndpoints && (
             <Segmented
               value={analyticsKind}
@@ -2069,6 +2078,9 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
               onChange={(value) => setAnalyticsKind(value as ModelKind)}
             />
           )}
+          <button type="button" className="icon-button" onClick={() => void refresh()} aria-label={t('actions.refresh')} title={t('actions.refresh')}>
+            <RefreshCw size={18} className={loading ? 'spin' : ''} />
+          </button>
           <TimeRangePicker value={analyticsRange} onChange={setAnalyticsRange} t={t} />
         </PageIntro>
         <AnalyticsSummaryView summary={summary} t={t} />

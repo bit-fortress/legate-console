@@ -1,4 +1,4 @@
-export type ThemeName = 'dark' | 'light';
+export type ThemeName = 'system' | 'dark' | 'light';
 export type Locale = 'zh' | 'en';
 
 export type WorkspaceStatus = 'active' | 'disabled';
