@@ -92,6 +92,7 @@ const endpoints: Endpoint[] = [
       id: 'gpt-5',
       textFeatures: ['text'],
       imageProtocolContracts: [],
+      imageProtocolLimits: [],
       inputPricePerMillion: '1',
       outputPricePerMillion: '2',
       cachePricePerMillion: '0'

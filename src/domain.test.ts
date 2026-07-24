@@ -50,6 +50,8 @@ describe('endpoint domain helpers', () => {
     expect(addEndpointModel(initial, '  gpt-5  ', 'text')).toBe(initial);
     const added = addEndpointModel(initial, ' gpt-5-mini ', 'text');
     expect(added[1]).toMatchObject({ id: 'gpt-5-mini', textFeatures: ['text'] });
+    const image = addEndpointModel([], 'gpt-image-2', 'image');
+    expect(image[0]).toMatchObject({ imageProtocolContracts: [] });
     expect(mergeEndpointModels(initial, [model('gpt-5'), model('gpt-5-nano')]).map((item) => item.id)).toEqual(['gpt-5', 'gpt-5-nano']);
     const priced = updateEndpointModel(added, 'gpt-5-mini', { inputPricePerMillion: '1.5' });
     expect(endpointModelHasPricing(priced[1])).toBe(true);

@@ -163,9 +163,16 @@ export interface EndpointModel {
   id: string;
   textFeatures: TextFeature[];
   imageProtocolContracts: ImageProtocolContract[];
+  imageProtocolLimits: ImageProtocolLimit[];
   inputPricePerMillion: string;
   outputPricePerMillion: string;
   cachePricePerMillion: string;
+}
+
+export interface ImageProtocolLimit {
+  contract: ImageProtocolContract;
+  maxImagesPerRequest: number;
+  maxReferenceImages?: number;
 }
 
 export interface DriverCredentialSlot {

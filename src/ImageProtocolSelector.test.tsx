@@ -31,4 +31,29 @@ describe('ImageProtocolSelector', () => {
     await user.click(checked);
     expect(onChange).toHaveBeenCalledWith([]);
   });
+
+  it('opens compact settings without enabling the capability', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ImageProtocolSelector
+        compact
+        label="Image APIs"
+        values={[]}
+        limits={[]}
+        disabledContracts={new Set()}
+        settingsLabel="Capability settings"
+        maxImagesLabel="Max images per request"
+        maxReferenceImagesLabel="Max reference images"
+        onChange={onChange}
+        onLimitChange={() => {}}
+      />
+    );
+
+    expect(document.querySelector('.image-protocol-config-detail')).toBeEmptyDOMElement();
+    await user.click(screen.getByRole('button', { name: 'Capability settings: OpenAI Image Generation' }));
+    expect(screen.getByRole('checkbox', { name: 'OpenAI Image Generation' })).not.toBeChecked();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('spinbutton', { name: 'Max images per request' })).toHaveValue(4);
+  });
 });

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CircleAlert, Code2, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { CircleAlert, CircleCheck, Code2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { CreateEndpointPayload, DiscoverEndpointModelsPayload } from './api';
 import anthropicMark from './assets/anthropic-mark.svg';
 import openAIMark from './assets/openai-mark.svg';
@@ -9,6 +9,7 @@ import type {
   EndpointGroup,
   EndpointModel,
   ImageProtocolContract,
+  ImageProtocolLimit,
   ModelKind
 } from './types';
 import ImageProtocolSelector from './ImageProtocolSelector';
@@ -26,6 +27,7 @@ import {
 import { DriverConfigForm } from './DriverConfigForm';
 import { SelectField } from './SelectControl';
 import { validateDriverConfigAgainstSchema, type DriverConfigValidationIssue } from './driverConfigSchema';
+import { IMAGE_PROTOCOL_CONTRACTS, imageProtocolDisplayName } from './imageProtocols';
 
 export type TextEndpointType = '' | 'openai_chat' | 'openai_responses' | 'anthropic_messages' | 'custom';
 
@@ -36,6 +38,18 @@ const BUILTIN_TEXT_DRIVER_REFS: Record<Exclude<TextEndpointType, '' | 'custom'>,
 };
 
 const DEFAULT_CREDENTIAL_SLOTS = [{ name: 'api_key', required: false }] as const;
+
+function defaultImageProtocolLimit(contract: ImageProtocolContract): ImageProtocolLimit {
+  return {
+    contract,
+    maxImagesPerRequest: 4,
+    ...(contract === 'openai.images.edits/2026-07-19' ? { maxReferenceImages: 4 } : {})
+  };
+}
+
+function clampImageLimit(value: number): number {
+  return Math.min(128, Math.max(1, Number.isFinite(value) ? Math.trunc(value) : 4));
+}
 
 export interface EndpointEditorLabels {
   createTitle: string;
@@ -66,7 +80,14 @@ export interface EndpointEditorLabels {
   syncModelsEmpty: string;
   removeModel: string;
   pricing: string;
+  pricingConfigured: string;
   pricingUnconfigured: string;
+  capabilities: string;
+  capabilitiesUnconfigured: string;
+  applyCapabilities: string;
+  capabilitySettings: string;
+  maxImagesPerRequest: string;
+  maxReferenceImages: string;
   inputPrice: string;
   outputPrice: string;
   cachePrice: string;
@@ -199,6 +220,9 @@ export default function EndpointEditor({
   const [pricingModelID, setPricingModelID] = useState<string | null>(null);
   const [pricingDraft, setPricingDraft] = useState({ input: '', output: '', cache: '' });
   const [pricingError, setPricingError] = useState('');
+  const [capabilityModelID, setCapabilityModelID] = useState<string | null>(null);
+  const [capabilityDraft, setCapabilityDraft] = useState<ImageProtocolContract[]>([]);
+  const [capabilityLimitsDraft, setCapabilityLimitsDraft] = useState<ImageProtocolLimit[]>([]);
   const compatibleDrivers = useMemo(
     () => draft.kind === 'text'
       ? drivers.filter((driver) => driver.manifest.kind === 'text' && driver.runtimeKind === 'wasm')
@@ -294,6 +318,7 @@ export default function EndpointEditor({
   }
 
   function openPricing(model: EndpointModel) {
+    setCapabilityModelID(null);
     setPricingModelID((current) => current === model.id ? null : model.id);
     setPricingDraft({
       input: model.inputPricePerMillion,
@@ -301,6 +326,43 @@ export default function EndpointEditor({
       cache: model.cachePricePerMillion
     });
     setPricingError('');
+  }
+
+  function openCapabilities(model: EndpointModel) {
+    setPricingModelID(null);
+    setCapabilityModelID((current) => current === model.id ? null : model.id);
+    setCapabilityDraft([...model.imageProtocolContracts]);
+    setCapabilityLimitsDraft(IMAGE_PROTOCOL_CONTRACTS.map((contract) => {
+      const configured = model.imageProtocolLimits.find((limit) => limit.contract === contract);
+      return configured ?? defaultImageProtocolLimit(contract);
+    }));
+  }
+
+  function changeCapabilities(values: ImageProtocolContract[]) {
+    setCapabilityDraft(values);
+  }
+
+  function changeCapabilityLimit(contract: ImageProtocolContract, patch: Partial<ImageProtocolLimit>) {
+    setCapabilityLimitsDraft((current) => current.map((limit) => limit.contract === contract ? {
+      ...limit,
+      ...patch,
+      maxImagesPerRequest: clampImageLimit(patch.maxImagesPerRequest ?? limit.maxImagesPerRequest),
+      ...(contract === 'openai.images.edits/2026-07-19'
+        ? { maxReferenceImages: clampImageLimit(patch.maxReferenceImages ?? limit.maxReferenceImages ?? 4) }
+        : {})
+    } : limit));
+  }
+
+  function applyCapabilities() {
+    if (!capabilityModelID) return;
+    setDraft((current) => ({
+      ...current,
+      models: updateEndpointModel(current.models, capabilityModelID, {
+        imageProtocolContracts: capabilityDraft,
+        imageProtocolLimits: capabilityLimitsDraft.filter((limit) => capabilityDraft.includes(limit.contract))
+      })
+    }));
+    setCapabilityModelID(null);
   }
 
   function applyPricing() {
@@ -539,26 +601,70 @@ export default function EndpointEditor({
           </div>
           <ul className="endpoint-model-list">
             {draft.models.map((model) => (
-              <li key={model.id} className={pricingModelID === model.id ? 'pricing-open' : undefined}>
+              <li
+                key={model.id}
+                className={[
+                  draft.kind === 'image' ? 'image-model' : '',
+                  pricingModelID === model.id || capabilityModelID === model.id ? 'model-config-open' : ''
+                ].filter(Boolean).join(' ') || undefined}
+              >
                 <div className="endpoint-model-row">
-                  <button
-                    type="button"
-                    className="endpoint-model-pricing-trigger"
-                    aria-expanded={pricingModelID === model.id}
-                    aria-label={`${labels.pricing}: ${model.id}`}
-                    onClick={() => openPricing(model)}
-                  >
-                    <code>{model.id}</code>
-                    {!endpointModelHasPricing(model) && (
-                      <span className="endpoint-model-unpriced" title={labels.pricingUnconfigured}>
-                        <CircleAlert size={15} aria-hidden="true" />
-                        <span>{labels.pricingUnconfigured}</span>
+                  <div className="endpoint-model-pricing-cell">
+                    <code className="endpoint-model-name">{model.id}</code>
+                    <button
+                      type="button"
+                      className="endpoint-model-pricing-status"
+                      data-configured={endpointModelHasPricing(model) || undefined}
+                      aria-expanded={pricingModelID === model.id}
+                      aria-label={`${endpointModelHasPricing(model)
+                        ? labels.pricingConfigured
+                        : labels.pricingUnconfigured}: ${model.id}`}
+                      title={endpointModelHasPricing(model)
+                        ? labels.pricingConfigured
+                        : labels.pricingUnconfigured}
+                      onClick={() => openPricing(model)}
+                    >
+                      {endpointModelHasPricing(model)
+                        ? <CircleCheck size={15} aria-hidden="true" />
+                        : <CircleAlert size={15} aria-hidden="true" />}
+                      <span>{endpointModelHasPricing(model)
+                        ? labels.pricingConfigured
+                        : labels.pricingUnconfigured}</span>
+                    </button>
+                  </div>
+                  {draft.kind === 'image' && (
+                    <button
+                      type="button"
+                      className="endpoint-model-capability-trigger"
+                      data-unconfigured={model.imageProtocolContracts.length === 0 || undefined}
+                      aria-expanded={capabilityModelID === model.id}
+                      aria-label={`${labels.capabilities}: ${model.id}`}
+                      title={model.imageProtocolContracts.length === 0
+                        ? labels.capabilitiesUnconfigured
+                        : model.imageProtocolContracts.map(imageProtocolDisplayName).join(', ')}
+                      onClick={() => openCapabilities(model)}
+                    >
+                      <span
+                        className="endpoint-model-capability-status-icon"
+                        data-configured={model.imageProtocolContracts.length > 0 || undefined}
+                        aria-hidden="true"
+                      >
+                        {model.imageProtocolContracts.length === 0
+                          ? <CircleAlert size={15} />
+                          : <CircleCheck size={15} />}
                       </span>
-                    )}
-                  </button>
+                      {model.imageProtocolContracts.length === 0 ? (
+                        <span>{labels.capabilitiesUnconfigured}</span>
+                      ) : (
+                        <span>{model.imageProtocolContracts
+                          .map((contract) => imageProtocolDisplayName(contract).replace('OpenAI ', ''))
+                          .join(' · ')}</span>
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="icon-button subtle"
+                    className="icon-button subtle endpoint-model-remove-trigger"
                     aria-label={`${labels.removeModel}: ${model.id}`}
                     title={labels.removeModel}
                     onClick={() => setDraft((current) => ({
@@ -569,16 +675,25 @@ export default function EndpointEditor({
                     <Trash2 size={15} aria-hidden="true" />
                   </button>
                 </div>
-                {draft.kind === 'image' && (
-                  <ImageProtocolSelector
-                    label={labels.imageProtocols}
-                    values={model.imageProtocolContracts}
-                    disabledContracts={new Set<ImageProtocolContract>()}
-                    onChange={(imageProtocolContracts) => setDraft((current) => ({
-                      ...current,
-                      models: updateEndpointModel(current.models, model.id, { imageProtocolContracts })
-                    }))}
-                  />
+                {capabilityModelID === model.id && (
+                  <div className="endpoint-model-capability-panel">
+                    <ImageProtocolSelector
+                      compact
+                      label={labels.imageProtocols}
+                      values={capabilityDraft}
+                      limits={capabilityLimitsDraft}
+                      disabledContracts={new Set<ImageProtocolContract>()}
+                      onChange={changeCapabilities}
+                      onLimitChange={changeCapabilityLimit}
+                      settingsLabel={labels.capabilitySettings}
+                      maxImagesLabel={labels.maxImagesPerRequest}
+                      maxReferenceImagesLabel={labels.maxReferenceImages}
+                    />
+                    <div className="endpoint-model-pricing-actions">
+                      <button type="button" className="btn secondary" onClick={() => setCapabilityModelID(null)}>{labels.cancel}</button>
+                      <button type="button" className="btn primary" onClick={applyCapabilities}>{labels.applyCapabilities}</button>
+                    </div>
+                  </div>
                 )}
                 {pricingModelID === model.id && (
                   <div className="endpoint-model-pricing-panel">

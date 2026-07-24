@@ -13,8 +13,6 @@ import type {
   WorkspaceAccess,
   WorkspaceCapability
 } from './types';
-import { IMAGE_PROTOCOL_CONTRACTS } from './imageProtocols';
-
 export function normalizeGroupMappings(mappings: ModelGroupMapping[]): ModelGroupMapping[] {
   const normalized = mappings.map((mapping) => {
     const tier = Number(mapping.tier);
@@ -77,7 +75,8 @@ export function addEndpointModel(models: EndpointModel[], rawId: string, kind: M
     {
       id,
       textFeatures: kind === 'text' ? ['text'] : [],
-      imageProtocolContracts: kind === 'image' ? [...IMAGE_PROTOCOL_CONTRACTS] : [],
+      imageProtocolContracts: [],
+      imageProtocolLimits: [],
       inputPricePerMillion: '0',
       outputPricePerMillion: '0',
       cachePricePerMillion: '0'
@@ -111,6 +110,7 @@ export function updateEndpointModel(
     if (
       updated.textFeatures === model.textFeatures
       && updated.imageProtocolContracts === model.imageProtocolContracts
+      && updated.imageProtocolLimits === model.imageProtocolLimits
       && updated.inputPricePerMillion === model.inputPricePerMillion
       && updated.outputPricePerMillion === model.outputPricePerMillion
       && updated.cachePricePerMillion === model.cachePricePerMillion

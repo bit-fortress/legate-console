@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import EndpointEditor, { EndpointDetail, type EndpointEditorLabels } from './EndpointEditor';
@@ -47,7 +47,14 @@ const labels: EndpointEditorLabels = {
   syncModelsEmpty: 'No remote models',
   removeModel: 'Remove model',
   pricing: 'Pricing',
+  pricingConfigured: 'Pricing configured',
   pricingUnconfigured: 'Pricing not configured',
+  capabilities: 'Model capabilities',
+  capabilitiesUnconfigured: 'Capabilities not configured',
+  applyCapabilities: 'Apply capabilities',
+  capabilitySettings: 'Capability settings',
+  maxImagesPerRequest: 'Max images per request',
+  maxReferenceImages: 'Max reference images',
   inputPrice: 'Input price',
   outputPrice: 'Output price',
   cachePrice: 'Cache hit price',
@@ -172,7 +179,10 @@ describe('EndpointEditor', () => {
     expect(await screen.findByText('gpt-4.1')).toBeInTheDocument();
     expect(screen.getAllByText('Pricing not configured')).toHaveLength(2);
 
-    await user.click(screen.getByRole('button', { name: 'Pricing: gpt-4.1' }));
+    const discoveredModelName = screen.getByText('gpt-4.1');
+    expect(discoveredModelName).toHaveClass('endpoint-model-name');
+    expect(discoveredModelName.closest('button')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Pricing not configured: gpt-4.1' }));
     const inputPrice = screen.getByRole('textbox', { name: 'Input price' });
     const priceInputGroup = inputPrice.closest('.endpoint-model-price-input');
     expect(priceInputGroup).not.toBeNull();
@@ -184,6 +194,9 @@ describe('EndpointEditor', () => {
     await user.type(screen.getByRole('textbox', { name: /Output price/ }), '5');
     await user.click(screen.getByRole('button', { name: 'Apply pricing' }));
     expect(screen.getAllByText('Pricing not configured')).toHaveLength(1);
+    const configuredPricing = screen.getByRole('button', { name: 'Pricing configured: gpt-4.1' });
+    expect(configuredPricing).toHaveTextContent('Pricing configured');
+    expect(configuredPricing).toHaveAttribute('data-configured');
 
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
@@ -192,6 +205,65 @@ describe('EndpointEditor', () => {
         inputPricePerMillion: '1.25',
         outputPricePerMillion: '5'
       })])
+    }));
+  });
+
+  it('configures image capabilities from a compact model-row panel', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderEditor({ endpoint: imageEndpointFixture(), onSubmit });
+
+    const unconfiguredPricingTrigger = screen.getByRole('button', { name: 'Pricing not configured: gpt-image-2' });
+    const modelName = screen.getByText('gpt-image-2');
+    expect(modelName).toHaveClass('endpoint-model-name');
+    expect(modelName.closest('button')).toBeNull();
+    expect(unconfiguredPricingTrigger).toHaveTextContent('Pricing not configured');
+
+    const capabilityTrigger = screen.getByRole('button', { name: 'Model capabilities: gpt-image-2' });
+    expect(capabilityTrigger).toHaveTextContent('Capabilities not configured');
+    expect(capabilityTrigger).toHaveAttribute('data-unconfigured');
+    expect(screen.queryByRole('checkbox', { name: 'OpenAI Image Generation' })).not.toBeInTheDocument();
+
+    await user.click(capabilityTrigger);
+    const generation = screen.getByRole('checkbox', { name: 'OpenAI Image Generation' });
+    const edit = screen.getByRole('checkbox', { name: 'OpenAI Image Edit' });
+    expect(generation.closest('.image-protocol-selector')).toHaveClass('compact');
+    const generationSettings = screen.getByRole('button', { name: 'Capability settings: OpenAI Image Generation' });
+    const editSettings = screen.getByRole('button', { name: 'Capability settings: OpenAI Image Edit' });
+    expect(generationSettings).toBeEnabled();
+    expect(editSettings).toBeEnabled();
+    expect(document.querySelector('.image-protocol-config-detail')).toBeEmptyDOMElement();
+    await user.click(generationSettings);
+    expect(generation).not.toBeChecked();
+    expect(screen.getByRole('spinbutton', { name: 'Max images per request' })).toHaveValue(4);
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Max images per request' }), { target: { value: '6' } });
+    await user.click(editSettings);
+    expect(edit).not.toBeChecked();
+    expect(screen.getByRole('spinbutton', { name: 'Max images per request' })).toHaveValue(4);
+    expect(screen.getByRole('spinbutton', { name: 'Max reference images' })).toHaveValue(4);
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Max images per request' }), { target: { value: '5' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Max reference images' }), { target: { value: '3' } });
+    await user.click(generation);
+    await user.click(edit);
+    await user.click(screen.getByRole('button', { name: 'Apply capabilities' }));
+
+    expect(capabilityTrigger).toHaveTextContent('Image Generation · Image Edit');
+    expect(capabilityTrigger).not.toHaveAttribute('data-unconfigured');
+    expect(capabilityTrigger.querySelector('.endpoint-model-capability-status-icon')).toHaveAttribute('data-configured');
+    expect(capabilityTrigger.querySelector('.endpoint-model-capability-status-icon svg')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      models: [expect.objectContaining({
+        id: 'gpt-image-2',
+        imageProtocolContracts: [
+          'openai.images.generations/2026-07-19',
+          'openai.images.edits/2026-07-19'
+        ],
+        imageProtocolLimits: [
+          { contract: 'openai.images.generations/2026-07-19', maxImagesPerRequest: 6 },
+          { contract: 'openai.images.edits/2026-07-19', maxImagesPerRequest: 5, maxReferenceImages: 3 }
+        ]
+      })]
     }));
   });
 
@@ -419,6 +491,7 @@ function endpointFixture(): Endpoint {
       id: 'gpt-5',
       textFeatures: ['text'],
       imageProtocolContracts: [],
+      imageProtocolLimits: [],
       inputPricePerMillion: '0',
       outputPricePerMillion: '0',
       cachePricePerMillion: '0'
@@ -428,5 +501,23 @@ function endpointFixture(): Endpoint {
     lastUsedAt: null,
     createdAt: '',
     updatedAt: '2026-07-16T01:00:00Z'
+  };
+}
+
+function imageEndpointFixture(): Endpoint {
+  return {
+    ...endpointFixture(),
+    name: 'OpenAI Image',
+    kind: 'image',
+    driverRef: 'profile://workspace/image@sha256:def',
+    models: [{
+      id: 'gpt-image-2',
+      textFeatures: [],
+      imageProtocolContracts: [],
+      imageProtocolLimits: [],
+      inputPricePerMillion: '0',
+      outputPricePerMillion: '0',
+      cachePricePerMillion: '0'
+    }]
   };
 }

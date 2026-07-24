@@ -368,13 +368,26 @@ describe('layout contracts', () => {
     expect(endpointCssRule('.endpoint-detail-field')).toContain('gap: 8px');
   });
 
-  it('keeps all primary navigation items in the mobile grid', () => {
+  it('keeps all primary navigation items in a compact labeled mobile grid', () => {
     expect(cssRule('.side-nav > div')).toContain('display: grid');
+    expect(appSource).toContain('<span>{label}</span>');
     expect(stylesSource).toMatch(
       /@media \(max-width: 860px\) \{[\s\S]*?\.side-nav\s*>\s*div\s*\{[^}]*display:\s*contents/
     );
     expect(stylesSource).toMatch(
       /@media \(max-width: 860px\) \{[\s\S]*?\.side-nav\s+\.nav-section-divider\s*\{[^}]*display:\s*none/
+    );
+    expect(stylesSource).toMatch(
+      /@media \(max-width: 860px\) \{[\s\S]*?\.sidebar,\s*\.sidebar\.collapsed\s*\{[^}]*grid-template-rows:\s*48px auto;[^}]*border-bottom:\s*1px solid var\(--border\)/
+    );
+    expect(stylesSource).toMatch(
+      /@media \(max-width: 860px\) \{[\s\S]*?\.sidebar \.nav-item,\s*\.sidebar\.collapsed \.nav-item\s*\{[^}]*min-height:\s*46px;[^}]*flex-direction:\s*column/
+    );
+    expect(stylesSource).toMatch(
+      /@media \(min-width: 560px\) and \(max-width: 860px\) \{[\s\S]*?grid-template-columns:\s*repeat\(9,\s*minmax\(0,\s*1fr\)\)/
+    );
+    expect(stylesSource).toMatch(
+      /@media \(max-width: 860px\) \{[\s\S]*?\.sidebar \.workspace-menu,[\s\S]*?top:\s*calc\(100% \+ 108px\)/
     );
   });
 

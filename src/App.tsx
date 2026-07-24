@@ -1279,7 +1279,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     aria-label={label}
                   >
                     <Icon {...navIconProps} />
-                    {!sidebarCollapsed && <span>{label}</span>}
+                    <span>{label}</span>
                   </button>
                 );
               })}
@@ -3720,7 +3720,14 @@ function endpointEditorLabels(t: (key: string) => string) {
     syncModelsEmpty: t('endpoints.syncModelsEmpty'),
     removeModel: t('endpoints.removeModel'),
     pricing: t('endpoints.pricing'),
+    pricingConfigured: t('endpoints.pricingConfigured'),
     pricingUnconfigured: t('endpoints.pricingUnconfigured'),
+    capabilities: t('endpoints.capabilities'),
+    capabilitiesUnconfigured: t('endpoints.capabilitiesUnconfigured'),
+    applyCapabilities: t('endpoints.applyCapabilities'),
+    capabilitySettings: t('endpoints.capabilitySettings'),
+    maxImagesPerRequest: t('endpoints.maxImagesPerRequest'),
+    maxReferenceImages: t('endpoints.maxReferenceImages'),
     inputPrice: t('endpoints.inputPrice'),
     outputPrice: t('endpoints.outputPrice'),
     cachePrice: t('endpoints.cachePrice'),

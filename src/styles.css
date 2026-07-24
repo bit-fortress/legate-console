@@ -383,6 +383,10 @@ a {
   padding: 0;
 }
 
+.sidebar.collapsed .nav-item span {
+  display: none;
+}
+
 .sidebar.collapsed .sidebar-footer {
   display: flex;
   justify-content: flex-start;
@@ -4082,11 +4086,80 @@ a {
   opacity: 0.48;
 }
 
-.text-protocol-option input {
+.text-protocol-option input[type='checkbox'] {
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
   accent-color: var(--accent);
+}
+
+.image-protocol-option {
+  display: grid;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.image-protocol-option-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 9px 12px;
+}
+
+.image-protocol-option-row > label {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.image-protocol-option-row > label > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-protocol-settings-trigger {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  flex: 0 0 28px;
+}
+
+.image-protocol-settings-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.image-protocol-limit-fields {
+  display: grid;
+  gap: 8px;
+  padding: 9px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-soft);
+}
+
+.image-protocol-limit-fields label {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  cursor: default;
+  font-size: 11px;
+}
+
+.image-protocol-limit-fields input[type='number'] {
+  width: 64px;
+  min-height: 28px;
+  padding: 3px 5px;
+  font-size: 12px;
+  text-align: center;
 }
 
 .text-protocol-logo {
@@ -4636,17 +4709,57 @@ a {
     border-bottom: 0;
   }
 
-  .app-shell {
+  .app-shell,
+  .app-shell.sidebar-collapsed {
     display: block;
   }
 
-  .sidebar {
-    position: static;
+  .sidebar,
+  .sidebar.collapsed {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: grid;
     height: auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 48px auto;
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
   }
 
-  .side-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .sidebar .brand,
+  .sidebar.collapsed .brand {
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: flex-start;
+    gap: 5px;
+    padding: 6px 10px;
+  }
+
+  .sidebar .brand > div {
+    display: block;
+  }
+
+  .sidebar.collapsed .brand-toggle,
+  .sidebar .brand-toggle {
+    width: 36px;
+    height: 36px;
+    margin: 0;
+  }
+
+  .sidebar .side-nav,
+  .sidebar.collapsed .side-nav {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-content: start;
+    justify-items: stretch;
+    gap: 4px;
+    width: 100%;
+    padding: 4px 8px 8px;
+    overflow: visible;
   }
 
   .side-nav > div {
@@ -4657,8 +4770,61 @@ a {
     display: none;
   }
 
-  .sidebar-footer {
-    display: none;
+  .sidebar .nav-item,
+  .sidebar.collapsed .nav-item {
+    width: 100%;
+    min-height: 46px;
+    flex-direction: column;
+    justify-content: center;
+    justify-self: stretch;
+    gap: 3px;
+    margin: 0;
+    padding: 5px 4px;
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  .sidebar .nav-item span,
+  .sidebar.collapsed .nav-item span {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
+  .sidebar .sidebar-footer,
+  .sidebar.collapsed .sidebar-footer {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 0;
+    padding: 6px 10px 6px 4px;
+    border-top: 0;
+  }
+
+  .sidebar .workspace-switcher,
+  .sidebar.collapsed .workspace-switcher {
+    width: 40px;
+    height: 36px;
+    min-height: 36px;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+  }
+
+  .sidebar .workspace-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .sidebar .workspace-menu,
+  .sidebar.collapsed .workspace-menu {
+    top: calc(100% + 108px);
+    right: 10px;
+    bottom: auto;
+    left: auto;
+    width: min(280px, calc(100vw - 20px));
   }
 
   .workspace {
@@ -4885,6 +5051,18 @@ a {
 
   .driver-profile-actions .btn {
     width: 100%;
+  }
+}
+
+@media (min-width: 560px) and (max-width: 860px) {
+  .sidebar .side-nav,
+  .sidebar.collapsed .side-nav {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
+
+  .sidebar .workspace-menu,
+  .sidebar.collapsed .workspace-menu {
+    top: calc(100% + 58px);
   }
 }
 

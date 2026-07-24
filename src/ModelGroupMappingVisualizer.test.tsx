@@ -183,6 +183,7 @@ function endpoint(id: number, name: string, modelIds: string[]): Endpoint {
       id: modelId,
       textFeatures: [],
       imageProtocolContracts: [],
+      imageProtocolLimits: [],
       inputPricePerMillion: '0',
       outputPricePerMillion: '0',
       cachePricePerMillion: '0'

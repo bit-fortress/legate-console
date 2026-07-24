@@ -761,14 +761,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeEndpointModel(model: Partial<EndpointModel> & { id: string }): EndpointModel {
+  const contracts = Array.isArray(model.imageProtocolContracts) ? model.imageProtocolContracts : [];
+  const configuredLimits = Array.isArray(model.imageProtocolLimits) ? model.imageProtocolLimits : [];
   return {
     id: model.id,
     textFeatures: Array.isArray(model.textFeatures) ? model.textFeatures : [],
-    imageProtocolContracts: Array.isArray(model.imageProtocolContracts) ? model.imageProtocolContracts : [],
+    imageProtocolContracts: contracts,
+    imageProtocolLimits: contracts.map((contract) => {
+      const configured = configuredLimits.find((limit) => limit?.contract === contract);
+      return {
+        contract,
+        maxImagesPerRequest: positiveIntegerOrDefault(configured?.maxImagesPerRequest, 4),
+        ...(contract === 'openai.images.edits/2026-07-19'
+          ? { maxReferenceImages: positiveIntegerOrDefault(configured?.maxReferenceImages, 4) }
+          : {})
+      };
+    }),
     inputPricePerMillion: typeof model.inputPricePerMillion === 'string' ? model.inputPricePerMillion : '0',
     outputPricePerMillion: typeof model.outputPricePerMillion === 'string' ? model.outputPricePerMillion : '0',
     cachePricePerMillion: typeof model.cachePricePerMillion === 'string' ? model.cachePricePerMillion : '0'
   };
+}
+
+function positiveIntegerOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 function normalizeGroup(group: ModelGroupResponse): ModelGroup {
