@@ -92,6 +92,7 @@ export interface GroupPayload {
   kind: ModelKind;
   description: string;
   status: ModelGroupStatus;
+  firstResponseTimeoutSeconds: number | null;
   routingMode: RoutingMode;
   sidecarConfigMode: SidecarConfigMode;
   inboundProtocolContracts: InboundProtocolContract[];
@@ -794,6 +795,11 @@ function normalizeGroup(group: ModelGroupResponse): ModelGroup {
   }
   return {
     ...group,
+    firstResponseTimeoutSeconds: positiveIntegerOrDefault(group.firstResponseTimeoutSeconds, 0) || null,
+    effectiveFirstResponseTimeoutSeconds: positiveIntegerOrDefault(
+      group.effectiveFirstResponseTimeoutSeconds,
+      group.kind === 'text' ? 180 : 300
+    ),
     inboundProtocolContracts: Array.isArray(group.inboundProtocolContracts) ? group.inboundProtocolContracts : [],
     routingMode: group.routingMode ?? 'tiered_failover',
     sidecarConfigMode,

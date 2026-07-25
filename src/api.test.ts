@@ -204,6 +204,7 @@ describe('endpoint API client', () => {
       kind: 'text',
       description: '',
       status: 'normal',
+      firstResponseTimeoutSeconds: null,
       routingMode: 'tiered_failover',
       sidecarConfigMode: 'full',
       inboundProtocolContracts: ['openai.chat_completions/2026-07-18'],
@@ -215,6 +216,7 @@ describe('endpoint API client', () => {
     expect(body.mappings[0]).toMatchObject({ endpointId: 101 });
     expect(body.mappings[0]).not.toHaveProperty('providerId');
     expect(body).toMatchObject({ inboundProtocolContracts: ['openai.chat_completions/2026-07-18'] });
+    expect(body.firstResponseTimeoutSeconds).toBeNull();
   });
 
   it('normalizes model group summaries from endpoint totals', async () => {
@@ -722,6 +724,8 @@ function modelGroup() {
     kind: 'text',
     description: '',
     status: 'normal',
+    firstResponseTimeoutSeconds: null,
+    effectiveFirstResponseTimeoutSeconds: 180,
     routingMode: 'tiered_failover',
     sidecarConfigMode: 'full',
     inboundProtocolContracts: ['openai.chat_completions/2026-07-18'],

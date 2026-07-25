@@ -183,8 +183,9 @@ interface DriverUploadDraft {
   manifestError: string;
 }
 
-interface GroupDraft extends GroupPayload {
+interface GroupDraft extends Omit<GroupPayload, 'firstResponseTimeoutSeconds'> {
   id?: number;
+  firstResponseTimeoutSeconds: string;
 }
 
 interface EndpointGroupDraft extends EndpointGroupPayload {
@@ -871,6 +872,9 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       kind,
       description: group?.description ?? '',
       status: group?.status ?? 'normal',
+      firstResponseTimeoutSeconds: group?.firstResponseTimeoutSeconds == null
+        ? ''
+        : String(group.firstResponseTimeoutSeconds),
       routingMode: group?.routingMode ?? 'tiered_failover',
       sidecarConfigMode: group?.sidecarConfigMode ?? 'full',
       inboundProtocolContracts: group?.inboundProtocolContracts?.length
@@ -906,6 +910,13 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       showToast('error', t('form.selectMappings'));
       return;
     }
+    const timeoutSeconds = groupDraft.firstResponseTimeoutSeconds.trim();
+    const parsedTimeoutSeconds = timeoutSeconds === '' ? null : Number(timeoutSeconds);
+    if (parsedTimeoutSeconds !== null &&
+      (!Number.isInteger(parsedTimeoutSeconds) || parsedTimeoutSeconds < 1 || parsedTimeoutSeconds > 1800)) {
+      showToast('error', t('form.invalidFirstResponseTimeout'));
+      return;
+    }
     const hasIncompatibleMapping = mappings.some((mapping) => {
       const endpoint = endpoints.find((item) => item.id === mapping.endpointId);
       const model = endpoint?.models.find((item) => item.id === mapping.modelId);
@@ -920,6 +931,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       kind: groupDraft.kind,
       description: groupDraft.description.trim(),
       status: groupDraft.status,
+      firstResponseTimeoutSeconds: parsedTimeoutSeconds,
       routingMode: groupDraft.routingMode,
       sidecarConfigMode: groupDraft.sidecarConfigMode,
       inboundProtocolContracts: groupDraft.kind === 'video' ? [] : groupDraft.inboundProtocolContracts,
@@ -2603,6 +2615,19 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
               ]}
             />
             <TextField label={t('groups.description')} value={groupDraft.description} onChange={(value) => setGroupDraft({ ...groupDraft, description: value })} />
+            <TextField
+              label={t('groups.firstResponseTimeout')}
+              type="number"
+              min="1"
+              max="1800"
+              step="1"
+              placeholder={t('groups.inheritDefault')}
+              status={t('groups.firstResponseTimeoutHint')
+                .replace('{default}', String(defaultFirstResponseTimeoutSeconds(groupDraft.kind)))
+                .replace('{max}', '1800')}
+              value={groupDraft.firstResponseTimeoutSeconds}
+              onChange={(value) => setGroupDraft({ ...groupDraft, firstResponseTimeoutSeconds: value })}
+            />
             <SelectField
               label={t('groups.sidecarConfigMode')}
               value={groupDraft.sidecarConfigMode}
@@ -3347,6 +3372,10 @@ function TextField({
   onBlur,
   status,
   type = 'text',
+  min,
+  max,
+  step,
+  placeholder,
   className
 }: {
   label: string;
@@ -3355,6 +3384,10 @@ function TextField({
   onBlur?: () => void;
   status?: string;
   type?: string;
+  min?: string;
+  max?: string;
+  step?: string;
+  placeholder?: string;
   className?: string;
 }) {
   return (
@@ -3368,6 +3401,10 @@ function TextField({
       <input
         aria-label={label}
         type={type}
+        min={min}
+        max={max}
+        step={step}
+        placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
@@ -3377,6 +3414,10 @@ function TextField({
       />
     </div>
   );
+}
+
+function defaultFirstResponseTimeoutSeconds(kind: ModelKind): number {
+  return kind === 'text' ? 180 : 300;
 }
 
 function TextAreaField({

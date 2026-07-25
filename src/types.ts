@@ -310,6 +310,8 @@ export interface ModelGroup {
   kind: ModelKind;
   description: string;
   status: ModelGroupStatus;
+  firstResponseTimeoutSeconds: number | null;
+  effectiveFirstResponseTimeoutSeconds: number;
   routingMode: RoutingMode;
   sidecarConfigMode: SidecarConfigMode;
   inboundProtocolContracts: InboundProtocolContract[];

@@ -231,6 +231,10 @@ describe('App endpoint permissions and flows', () => {
 
     await user.click(await screen.findByRole('button', { name: '添加模型组' }));
     const dialog = screen.getByRole('dialog', { name: '添加模型组' });
+    const timeoutInput = within(dialog).getByRole('spinbutton', { name: '上游首响应超时（秒）' });
+    expect(timeoutInput).toHaveAttribute('placeholder', '继承默认值');
+    expect(timeoutInput).toHaveAttribute('max', '1800');
+    expect(within(dialog).getByText('留空默认 180 秒，最高 1800 秒')).toBeInTheDocument();
     const endpointSelect = within(dialog).getByRole('button', { name: '接入点' });
 
     await user.click(endpointSelect);
@@ -248,6 +252,16 @@ describe('App endpoint permissions and flows', () => {
     expect(within(dialog).getByLabelText('OpenAI Chat Completions')).not.toBeDisabled();
     expect(within(dialog).getByLabelText('OpenAI Responses')).toBeDisabled();
     expect(within(dialog).getByLabelText('Anthropic Messages')).toBeDisabled();
+
+    await user.type(within(dialog).getByRole('textbox', { name: '名称' }), 'reasoning');
+    await user.type(timeoutInput, '181');
+    await user.click(within(dialog).getByRole('button', { name: '模型' }));
+    await user.click(screen.getByRole('option', { name: 'gpt-5' }));
+    await user.click(within(dialog).getByRole('button', { name: '保存' }));
+
+    await waitFor(() => expect(api.createGroup).toHaveBeenCalledWith(expect.objectContaining({
+      firstResponseTimeoutSeconds: 181
+    })));
   });
 
   it('keeps mapping creation in a list toolbar and reorders tiers only after blur', async () => {
@@ -322,6 +336,7 @@ describe('App endpoint permissions and flows', () => {
     const dialog = screen.getByRole('dialog', { name: '添加模型组' });
     await user.click(within(dialog).getByRole('button', { name: '类型' }));
     await user.click(screen.getByRole('option', { name: '图片' }));
+    expect(within(dialog).getByText('留空默认 300 秒，最高 1800 秒')).toBeInTheDocument();
     const endpointSelect = within(dialog).getByRole('button', { name: '接入点' });
 
     await user.click(endpointSelect);
