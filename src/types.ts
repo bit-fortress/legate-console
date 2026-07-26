@@ -318,9 +318,46 @@ export interface ModelGroup {
   mappings: ModelGroupMapping[];
   endpointTotal: number;
   endpointAvailable: number;
-  uptime: Uptime;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ModelGroupMappingStatisticsBucket {
+  from: string;
+  to: string;
+  availableAttemptCount: number;
+  attemptCount: number;
+  uptimePercentage: number | null;
+}
+
+export interface ModelGroupMappingStatistic {
+  endpointId: number;
+  upstreamModelId: string;
+  availableAttemptCount: number;
+  attemptCount: number;
+  uptimePercentage: number | null;
+  p50TimeToFirstOutputMs: number | null;
+  timeToFirstOutputSampleCount: number;
+  p50TokensPerSecond: number | null;
+  tokensPerSecondSampleCount: number;
+  buckets: ModelGroupMappingStatisticsBucket[];
+}
+
+export interface ModelGroupMappingStatistics {
+  window: {
+    from: string;
+    to: string;
+    bucketSeconds: number;
+  };
+  group: {
+    availableAttemptCount: number;
+    attemptCount: number;
+    uptimePercentage: number | null;
+    historicalOnlyAttemptCount: number;
+    buckets: ModelGroupMappingStatisticsBucket[];
+  };
+  mappings: ModelGroupMappingStatistic[];
+  completeness: InvocationAnalyticsCompleteness;
 }
 
 export interface APIKeyModelGroup {

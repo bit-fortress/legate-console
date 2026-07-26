@@ -9,6 +9,8 @@ import {
   deleteEndpointGroup,
   discoverEndpointModels,
   getAnalyticsSummary,
+  getGroup,
+  getModelGroupMappingStatistics,
   getDriverProfile,
   getEndpoint,
   getEndpointGroup,
@@ -237,6 +239,34 @@ describe('endpoint API client', () => {
     fetchMock.mockResolvedValue(response({ items: [modelGroup()] }));
     const [group] = await listGroups();
     expect(group).toMatchObject({ endpointTotal: 1, endpointAvailable: 1, inboundProtocolContracts: ['openai.chat_completions/2026-07-18'] });
+    expect(group).not.toHaveProperty('uptime');
+  });
+
+  it('loads a model group item through its canonical detail route', async () => {
+    fetchMock.mockResolvedValue(response(modelGroup()));
+
+    await expect(getGroup(3)).resolves.toMatchObject({ id: 3, name: 'chat' });
+    expect(requestAt(0)[0]).toBe('/api/admin/model-groups/3');
+  });
+
+  it('queries mapping statistics with the exact group window and bucket contract', async () => {
+    fetchMock.mockResolvedValue(response({
+      window: { from: '2026-07-26T00:00:00Z', to: '2026-07-26T01:00:00Z', bucketSeconds: 60 },
+      group: { availableAttemptCount: 0, attemptCount: 0, uptimePercentage: null, historicalOnlyAttemptCount: 0 },
+      mappings: [],
+      completeness: analyticsSummaryResponse().completeness
+    }));
+
+    const result = await getModelGroupMappingStatistics({
+      groupId: 3,
+      from: '2026-07-26T00:00:00Z',
+      to: '2026-07-26T01:00:00Z',
+      bucket: '1m'
+    });
+
+    expect(requestAt(0)[0]).toBe('/api/admin/analytics/model-group-mappings?groupId=3&from=2026-07-26T00%3A00%3A00Z&to=2026-07-26T01%3A00%3A00Z&bucket=1m');
+    expect(result.group.uptimePercentage).toBeNull();
+    expect(result.group.historicalOnlyAttemptCount).toBe(0);
   });
 
   it('uses only the three V1 analytics routes with stable typed query ordering', async () => {

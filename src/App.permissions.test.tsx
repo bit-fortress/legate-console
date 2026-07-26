@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import * as api from './api';
-import type { DriverCatalogItem, DriverProfile, Endpoint, EndpointGroup, InvocationAnalyticsSummary, InvocationAttempt, ModelKind, WorkspaceAccess } from './types';
+import type { DriverCatalogItem, DriverProfile, Endpoint, EndpointGroup, InvocationAnalyticsSummary, InvocationAttempt, ModelGroup, ModelGroupMappingStatistics, ModelKind, WorkspaceAccess } from './types';
 
 vi.mock('./api', () => ({
   LegateAPIError: class LegateAPIError extends Error {
@@ -32,6 +32,8 @@ vi.mock('./api', () => ({
   deleteSidecarToken: vi.fn(),
   discoverEndpointModels: vi.fn(),
   getAnalyticsSummary: vi.fn(),
+  getGroup: vi.fn(),
+  getModelGroupMappingStatistics: vi.fn(),
   getSidecarInstance: vi.fn(),
   getSidecarSnapshot: vi.fn(),
   getWorkspaceSlug: vi.fn(() => 'workspace-alpha'),
@@ -125,6 +127,7 @@ describe('App endpoint permissions and flows', () => {
     vi.mocked(api.listInvocationAttempts).mockResolvedValue({ items: [], nextCursor: null });
     vi.mocked(api.listInvocationRequests).mockResolvedValue({ items: [], nextCursor: null });
     vi.mocked(api.getAnalyticsSummary).mockResolvedValue(analyticsSummaryFixture());
+    vi.mocked(api.getModelGroupMappingStatistics).mockResolvedValue(modelGroupStatisticsFixture());
     vi.mocked(api.listWorkspaces).mockResolvedValue([]);
     vi.mocked(api.createEndpoint).mockResolvedValue(endpoints[0]);
   });
@@ -287,6 +290,26 @@ describe('App endpoint permissions and flows', () => {
     await user.tab();
     tierInputs = within(dialog).getAllByRole('spinbutton', { name: '层级' });
     expect(tierInputs.map((input) => (input as HTMLInputElement).value)).toEqual(['0', '2']);
+  });
+
+  it('loads a model group detail URL directly with the dedicated group and analytics contracts', async () => {
+    const detailGroup: ModelGroup = {
+      id: 3, workspaceId: 1, name: 'chat', description: 'Primary route', kind: 'text', status: 'normal',
+      firstResponseTimeoutSeconds: null, effectiveFirstResponseTimeoutSeconds: 180, routingMode: 'tiered_failover', sidecarConfigMode: 'full',
+      inboundProtocolContracts: ['openai.chat_completions/2026-07-18'],
+      mappings: [{ id: 41, groupId: 3, endpointId: 101, modelId: 'gpt-5', tier: 0, weight: 100, sortOrder: 0 }],
+      endpointTotal: 1, endpointAvailable: 1, createdAt: '', updatedAt: ''
+    };
+    window.history.replaceState({}, '', '/groups/3');
+    vi.mocked(api.getGroup).mockResolvedValue(detailGroup);
+    mockWorkspace(['model_groups:read', 'analytics:read', 'endpoints:read']);
+
+    renderApp();
+
+    expect(await screen.findByRole('heading', { name: 'chat' })).toBeInTheDocument();
+    expect(api.getGroup).toHaveBeenCalledWith(3);
+    expect(api.listGroups).not.toHaveBeenCalled();
+    await waitFor(() => expect(api.getModelGroupMappingStatistics).toHaveBeenCalledWith(expect.objectContaining({ groupId: 3, bucket: '1m' })));
   });
 
   it('links exposed image protocols with compatible endpoint choices in both directions', async () => {
@@ -730,6 +753,25 @@ function analyticsSummaryFixture(): InvocationAnalyticsSummary {
       knownDroppedEventCountSaturated: false,
       sources: []
     }
+  };
+}
+
+function modelGroupStatisticsFixture(): ModelGroupMappingStatistics {
+  return {
+    window: { from: '2026-07-26T00:00:00Z', to: '2026-07-26T01:00:00Z', bucketSeconds: 60 },
+    group: {
+      availableAttemptCount: 1,
+      attemptCount: 1,
+      uptimePercentage: 100,
+      historicalOnlyAttemptCount: 0,
+      buckets: [{ from: '2026-07-26T00:00:00Z', to: '2026-07-26T00:01:00Z', availableAttemptCount: 1, attemptCount: 1, uptimePercentage: 100 }]
+    },
+    mappings: [{
+      endpointId: 101, upstreamModelId: 'gpt-5', availableAttemptCount: 1, attemptCount: 1, uptimePercentage: 100,
+      p50TimeToFirstOutputMs: 20, timeToFirstOutputSampleCount: 1, p50TokensPerSecond: 50, tokensPerSecondSampleCount: 1,
+      buckets: [{ from: '2026-07-26T00:00:00Z', to: '2026-07-26T00:01:00Z', availableAttemptCount: 1, attemptCount: 1, uptimePercentage: 100 }]
+    }],
+    completeness: analyticsSummaryFixture().completeness
   };
 }
 

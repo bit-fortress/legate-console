@@ -10,6 +10,7 @@ import selectControlSource from './SelectControl.tsx?raw';
 import adminUsersSource from './AdminUsersPage.tsx?raw';
 import endpointEditorSource from './EndpointEditor.tsx?raw';
 import endpointsPageSource from './EndpointsPage.tsx?raw';
+import modelGroupDetailSource from './ModelGroupDetailPage.tsx?raw';
 import { buttonLabelKeys, dictionaryFor } from './i18n';
 
 const stylesSource = readFileSync(new URL('./styles.css', import.meta.url), 'utf8');
@@ -222,6 +223,20 @@ describe('layout contracts', () => {
     expect(stylesSource).toContain('.mapping-visualizer');
     expect(stylesSource).toContain('.mapping-model-node.selected');
     expect(stylesSource).toContain('.mapping-inspector');
+  });
+
+  it('keeps model group detail navigation and no-sample uptime styling explicit', () => {
+    const zh = dictionaryFor('zh');
+    const en = dictionaryFor('en');
+    expect(modelGroupDetailSource).toContain('className="icon-button group-detail-back"');
+    expect(modelGroupDetailSource).toContain('<ArrowLeft size={18} />');
+    expect(cssRule('.group-detail-back')).not.toContain('box-shadow');
+    expect(cssRule('.mapping-uptime-buckets span.empty')).toContain('background: var(--border-strong)');
+    expect(cssRule('.mapping-uptime-buckets span.empty')).not.toContain('gradient');
+    expect(cssRule('.group-uptime-empty-line')).toContain('stroke: var(--border-strong)');
+    expect(zh['groupDetail.groupUptimeTrend']).toBe('模型组 Uptime 趋势');
+    expect(zh['groupDetail.closeEndpointDetails']).toBe('关闭 Endpoint 详情');
+    expect(en['groupDetail.specifications']).toBe('Configuration details');
   });
 
   it('supports collapsible sidebar without a side search box', () => {

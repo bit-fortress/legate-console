@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import type { ComponentProps } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ModelGroupMappingVisualizer, type ModelGroupMappingVisualizerLabels } from './ModelGroupMappingVisualizer';
+import { ModelGroupMappingVisualizer, type ModelGroupMappingVisualizerLabels, type ModelGroupMappingVisualizerProps } from './ModelGroupMappingVisualizer';
 import type { Endpoint, ModelGroupMapping } from './types';
 
 afterEach(cleanup);
@@ -14,7 +13,7 @@ const labels: ModelGroupMappingVisualizerLabels = {
   start: 'Route entry',
   layer: 'Layer',
   model: 'Model',
-  provider: 'Model provider',
+  endpoint: 'Endpoint',
   tier: 'Tier',
   weight: 'Weight',
   addModel: 'Add model',
@@ -26,7 +25,11 @@ const labels: ModelGroupMappingVisualizerLabels = {
   layerTraffic: 'Layer traffic distribution',
   trafficShare: 'Traffic share',
   noTraffic: 'No model traffic in this layer',
-  pendingApply: 'Pending'
+  pendingApply: 'Pending',
+  endpointGroup: 'Endpoint group',
+  schedulable: 'Schedulable',
+  yes: 'Yes',
+  no: 'No'
 };
 
 const endpoints = [
@@ -56,7 +59,7 @@ describe('ModelGroupMappingVisualizer', () => {
     expect(onAddMapping).toHaveBeenCalledWith(2);
   });
 
-  it('edits the selected node through the provider and model controls', async () => {
+  it('edits the selected node through the endpoint and model controls', async () => {
     const user = userEvent.setup();
     const onChangeMapping = vi.fn((index: number) => index);
     renderVisualizer({ onChangeMapping });
@@ -64,7 +67,7 @@ describe('ModelGroupMappingVisualizer', () => {
     await user.click(screen.getByRole('button', { name: 'Model gpt-4o' }));
     expect(screen.getByRole('complementary', { name: 'Model configuration' })).toHaveTextContent('OpenAI');
 
-    await user.click(screen.getByRole('button', { name: 'Model provider' }));
+    await user.click(screen.getByRole('button', { name: 'Endpoint' }));
     await user.click(screen.getByRole('option', { name: 'Anthropic' }));
     expect(onChangeMapping).toHaveBeenCalledWith(0, { endpointId: 2, modelId: '' }, true);
 
@@ -146,12 +149,60 @@ describe('ModelGroupMappingVisualizer', () => {
     await user.click(canvas);
     expect(screen.getByRole('complementary', { name: 'Model configuration' })).toHaveTextContent('No model selected');
   });
+
+  it('renders controlled readonly selection without any mutation controls', async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    render(
+      <ModelGroupMappingVisualizer
+        mode="readonly"
+        groupName="chat"
+        groupKind="text"
+        mappings={[{ ...mappings[0], id: 41 }]}
+        endpoints={endpoints}
+        labels={labels}
+        tierLabel={() => 'Primary pool'}
+        selection={null}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: 'Add model' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add fallback layer' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete model' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Model gpt-4o' }));
+    expect(onSelectionChange).toHaveBeenCalledWith({ type: 'mapping', mappingId: 41 });
+  });
+
+  it('uses schedule and mapped-model configuration for readonly schedulability', () => {
+    render(
+      <ModelGroupMappingVisualizer
+        mode="readonly"
+        groupName="chat"
+        groupKind="text"
+        mappings={[{ ...mappings[0], id: 41 }]}
+        endpoints={[{ ...endpoints[0], scheduleEnabled: false }]}
+        endpointGroupName={() => 'Production'}
+        labels={labels}
+        tierLabel={() => 'Primary pool'}
+        selection={{ type: 'mapping', mappingId: 41 }}
+        onSelectionChange={vi.fn()}
+      />
+    );
+
+    const inspector = screen.getByRole('complementary', { name: 'Model configuration' });
+    expect(inspector).toHaveTextContent('Production');
+    expect(inspector).toHaveTextContent(/Schedulable\s*No/);
+  });
 });
 
-function renderVisualizer(overrides: Partial<ComponentProps<typeof ModelGroupMappingVisualizer>> = {}) {
+function renderVisualizer(overrides: Partial<Extract<ModelGroupMappingVisualizerProps, { mode: 'edit' }>> = {}) {
   return render(
     <ModelGroupMappingVisualizer
+      mode="edit"
       groupName="chat"
+      groupKind="text"
       mappings={mappings}
       endpoints={endpoints}
       labels={labels}

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Box, ChartPie, CirclePlus, GitBranch, Layers3, Server, Trash2, Zap } from 'lucide-react';
 import { SelectField } from './SelectControl';
-import type { Endpoint, EndpointModel, ModelGroupMapping } from './types';
+import type { Endpoint, EndpointModel, ModelGroupMapping, ModelKind } from './types';
 
 export interface ModelGroupMappingVisualizerLabels {
   start: string;
   layer: string;
   model: string;
-  provider: string;
+  endpoint: string;
   tier: string;
   weight: string;
   addModel: string;
@@ -20,43 +20,55 @@ export interface ModelGroupMappingVisualizerLabels {
   trafficShare: string;
   noTraffic: string;
   pendingApply: string;
+  endpointGroup: string;
+  schedulable: string;
+  yes: string;
+  no: string;
 }
 
-interface ModelGroupMappingVisualizerProps {
+interface ModelGroupMappingVisualizerBaseProps {
   groupName: string;
+  groupKind: ModelKind;
   mappings: ModelGroupMapping[];
   endpoints: Endpoint[];
   labels: ModelGroupMappingVisualizerLabels;
   tierLabel: (tier: number) => string;
-  modelsForEndpoint: (endpointId: number) => EndpointModel[];
-  onChangeMapping: (index: number, patch: Partial<ModelGroupMapping>, reorder: boolean) => number;
-  onAddMapping: (tier: number) => number;
-  onRemoveMapping: (index: number) => void;
+  endpointGroupName?: (groupId: number) => string | undefined;
 }
 
-type VisualizerSelection =
-  | { type: 'mapping'; index: number }
+export type VisualizerSelection =
+  | { type: 'mapping'; mappingId: number }
   | { type: 'tier'; tier: number }
   | null;
 
+export type ModelGroupMappingVisualizerProps = ModelGroupMappingVisualizerBaseProps & (
+  | {
+      mode: 'readonly';
+      selection: VisualizerSelection;
+      onSelectionChange: (selection: VisualizerSelection) => void;
+    }
+  | {
+      mode: 'edit';
+      modelsForEndpoint: (endpointId: number) => EndpointModel[];
+      onChangeMapping: (index: number, patch: Partial<ModelGroupMapping>, reorder: boolean) => number;
+      onAddMapping: (tier: number) => number;
+      onRemoveMapping: (index: number) => void;
+    }
+);
+
 const trafficColors = ['#2563eb', '#12b76a', '#f79009', '#7f56d9', '#06b6d4', '#ef4444', '#eab308', '#ec4899'];
 
-export function ModelGroupMappingVisualizer({
-  groupName,
-  mappings,
-  endpoints,
-  labels,
-  tierLabel,
-  modelsForEndpoint,
-  onChangeMapping,
-  onAddMapping,
-  onRemoveMapping
-}: ModelGroupMappingVisualizerProps) {
-  const [selection, setSelection] = useState<VisualizerSelection>(null);
+export function ModelGroupMappingVisualizer(props: ModelGroupMappingVisualizerProps) {
+  const { groupName, groupKind, mappings, endpoints, labels, tierLabel } = props;
+  const [editSelection, setEditSelection] = useState<VisualizerSelection>(null);
   const [tierDraft, setTierDraft] = useState<number | null>(null);
+  const selection = props.mode === 'readonly' ? props.selection : editSelection;
+  const setSelection = props.mode === 'readonly' ? props.onSelectionChange : setEditSelection;
   const tiers = Array.from(new Set([0, ...mappings.map((mapping) => mapping.tier ?? 0)]))
     .sort((left, right) => left - right);
-  const selectedIndex = selection?.type === 'mapping' ? selection.index : null;
+  const selectedIndex = selection?.type === 'mapping'
+    ? mappings.findIndex((mapping, index) => mappingSelectionID(mapping, index) === selection.mappingId)
+    : null;
   const selectedTier = selection?.type === 'tier' ? selection.tier : null;
   const selectedMapping = selectedIndex == null ? null : mappings[selectedIndex] ?? null;
   const maxTier = tiers[tiers.length - 1] ?? 0;
@@ -73,32 +85,36 @@ export function ModelGroupMappingVisualizer({
   }, [mappings.length, selectedIndex, selectedTier, tiers]);
 
   function addMapping(tier: number) {
-    const nextIndex = onAddMapping(tier);
+    if (props.mode !== 'edit') return;
+    const nextIndex = props.onAddMapping(tier);
     setTierDraft(null);
-    setSelection({ type: 'mapping', index: nextIndex });
+    setSelection({ type: 'mapping', mappingId: mappingSelectionID(mappings[nextIndex], nextIndex) });
   }
 
   function changeSelectedMapping(patch: Partial<ModelGroupMapping>) {
     if (selectedIndex == null) return;
-    const nextIndex = onChangeMapping(selectedIndex, patch, true);
-    setSelection({ type: 'mapping', index: nextIndex });
+    if (props.mode !== 'edit') return;
+    const nextIndex = props.onChangeMapping(selectedIndex, patch, true);
+    setSelection({ type: 'mapping', mappingId: mappingSelectionID(mappings[nextIndex], nextIndex) });
   }
 
   function selectMapping(index: number) {
     setTierDraft(null);
-    setSelection({ type: 'mapping', index });
+    setSelection({ type: 'mapping', mappingId: mappingSelectionID(mappings[index], index) });
   }
 
   function commitTierDraft() {
     if (selectedIndex == null || tierDraft == null) return;
-    const nextIndex = onChangeMapping(selectedIndex, { tier: tierDraft }, true);
-    setSelection({ type: 'mapping', index: nextIndex });
+    if (props.mode !== 'edit') return;
+    const nextIndex = props.onChangeMapping(selectedIndex, { tier: tierDraft }, true);
+    setSelection({ type: 'mapping', mappingId: mappingSelectionID(mappings[nextIndex], nextIndex) });
     setTierDraft(null);
   }
 
   function removeSelectedMapping() {
     if (selectedIndex == null) return;
-    onRemoveMapping(selectedIndex);
+    if (props.mode !== 'edit') return;
+    props.onRemoveMapping(selectedIndex);
     setTierDraft(null);
     setSelection(null);
   }
@@ -167,33 +183,39 @@ export function ModelGroupMappingVisualizer({
                       >
                         <span className="mapping-node-label"><Box size={12} /> {labels.model}</span>
                         <span className="mapping-node-body">
-                          <span className="mapping-provider-mark"><Server size={17} /></span>
+                          <span className="mapping-endpoint-mark"><Server size={17} /></span>
                           <span className="mapping-node-copy">
                             <strong title={mapping.modelId}>{mapping.modelId || labels.selectModel}</strong>
-                            <small title={endpoint?.name}>{endpoint?.name || labels.provider}</small>
+                            <small title={endpoint?.name}>{endpoint?.name || labels.endpoint}</small>
                           </span>
                         </span>
                         <span className="mapping-node-meta">
                           <span>{labels.weight} {mapping.weight ?? 100}</span>
-                          {endpoint && <i className={endpoint.status === 'enabled' ? 'available' : ''} />}
+                          {endpoint && <i className={mappingIsSchedulable(endpoint, mapping, groupKind) ? 'available' : ''} title={`${labels.schedulable}: ${mappingIsSchedulable(endpoint, mapping, groupKind) ? labels.yes : labels.no}`} />}
                         </span>
                       </button>
                     );
                   })}
-                  <button type="button" className="mapping-add-node" onClick={() => addMapping(tier)}>
-                    <CirclePlus size={18} />
-                    <span>{labels.addModel}</span>
-                  </button>
+                  {props.mode === 'edit' && (
+                    <button type="button" className="mapping-add-node" onClick={() => addMapping(tier)}>
+                      <CirclePlus size={18} />
+                      <span>{labels.addModel}</span>
+                    </button>
+                  )}
                 </div>
               </section>
             </div>
           );
         })}
 
-        <div className="mapping-flow-connector mapping-add-fallback-connector" aria-hidden="true" />
-        <button type="button" className="mapping-add-fallback" onClick={() => addMapping(maxTier + 1)}>
-          <Layers3 size={16} /> {labels.addFallback}
-        </button>
+        {props.mode === 'edit' && (
+          <>
+            <div className="mapping-flow-connector mapping-add-fallback-connector" aria-hidden="true" />
+            <button type="button" className="mapping-add-fallback" onClick={() => addMapping(maxTier + 1)}>
+              <Layers3 size={16} /> {labels.addFallback}
+            </button>
+          </>
+        )}
       </div>
 
       <aside className="mapping-inspector" aria-label={selectedTier == null ? labels.modelConfiguration : labels.layerTraffic}>
@@ -209,12 +231,12 @@ export function ModelGroupMappingVisualizer({
             endpoints={endpoints}
             labels={labels}
           />
-        ) : selectedMapping && selectedIndex != null ? (
+        ) : selectedMapping && selectedIndex != null && props.mode === 'edit' ? (
           <div className="mapping-inspector-form">
             <SelectField
-              label={labels.provider}
+              label={labels.endpoint}
               value={selectedMapping.endpointId ? String(selectedMapping.endpointId) : ''}
-              placeholder={labels.provider}
+              placeholder={labels.endpoint}
               onChange={(value) => changeSelectedMapping({ endpointId: value ? Number(value) : 0, modelId: '' })}
               options={endpoints.map((endpoint) => ({ value: String(endpoint.id), label: endpoint.name }))}
             />
@@ -224,7 +246,7 @@ export function ModelGroupMappingVisualizer({
               placeholder={labels.selectModel}
               disabled={!selectedMapping.endpointId}
               onChange={(modelId) => changeSelectedMapping({ modelId })}
-              options={modelsForEndpoint(selectedMapping.endpointId).map((model) => ({ value: model.id, label: model.id }))}
+              options={props.modelsForEndpoint(selectedMapping.endpointId).map((model) => ({ value: model.id, label: model.id }))}
             />
             <div className="mapping-inspector-numbers">
               <label className="field">
@@ -260,6 +282,14 @@ export function ModelGroupMappingVisualizer({
               <Trash2 size={15} /> {labels.deleteModel}
             </button>
           </div>
+        ) : selectedMapping && selectedIndex != null ? (
+          <ReadonlyMappingInspector
+            mapping={selectedMapping}
+            endpoint={endpoints.find((item) => item.id === selectedMapping.endpointId)}
+            endpointGroupName={props.endpointGroupName}
+            groupKind={groupKind}
+            labels={labels}
+          />
         ) : (
           <div className="mapping-inspector-empty">
             <Box size={25} />
@@ -269,6 +299,39 @@ export function ModelGroupMappingVisualizer({
       </aside>
     </div>
   );
+}
+
+function mappingSelectionID(mapping: ModelGroupMapping | undefined, index: number): number {
+  return mapping?.id ?? -(index + 1);
+}
+
+function ReadonlyMappingInspector({
+  mapping,
+  endpoint,
+  endpointGroupName,
+  groupKind,
+  labels
+}: {
+  mapping: ModelGroupMapping;
+  endpoint?: Endpoint;
+  endpointGroupName?: (groupId: number) => string | undefined;
+  groupKind: ModelKind;
+  labels: ModelGroupMappingVisualizerLabels;
+}) {
+  return (
+    <dl className="mapping-readonly-inspector">
+      <div><dt>{labels.endpointGroup}</dt><dd title={endpoint ? endpointGroupName?.(endpoint.groupId) : undefined}>{endpoint ? endpointGroupName?.(endpoint.groupId) ?? `#${endpoint.groupId}` : labels.no}</dd></div>
+      <div><dt>{labels.endpoint}</dt><dd title={endpoint?.name}>{endpoint?.name ?? `#${mapping.endpointId}`}</dd></div>
+      <div><dt>{labels.model}</dt><dd title={mapping.modelId}>{mapping.modelId}</dd></div>
+      <div><dt>{labels.tier}</dt><dd>{(mapping.tier ?? 0) + 1}</dd></div>
+      <div><dt>{labels.weight}</dt><dd>{mapping.weight ?? 100}</dd></div>
+      <div><dt>{labels.schedulable}</dt><dd>{endpoint && mappingIsSchedulable(endpoint, mapping, groupKind) ? labels.yes : labels.no}</dd></div>
+    </dl>
+  );
+}
+
+function mappingIsSchedulable(endpoint: Endpoint, mapping: ModelGroupMapping, groupKind: ModelKind): boolean {
+  return endpoint.kind === groupKind && endpoint.status === 'enabled' && endpoint.scheduleEnabled && endpoint.models.some((model) => model.id === mapping.modelId);
 }
 
 function LayerTrafficInspector({
@@ -326,7 +389,7 @@ function LayerTrafficInspector({
                 <i style={{ backgroundColor: row.color }} />
                 <span>
                   <strong title={row.mapping.modelId}>{row.mapping.modelId || labels.selectModel}</strong>
-                  <small title={endpoint?.name}>{endpoint?.name || labels.provider}</small>
+                  <small title={endpoint?.name}>{endpoint?.name || labels.endpoint}</small>
                 </span>
                 <b>{formatTrafficPercentage(row.percentage)}</b>
               </div>

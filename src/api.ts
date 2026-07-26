@@ -20,6 +20,7 @@ import type {
   InvocationRequestPage,
   InvocationRequestRole,
   ModelGroup,
+  ModelGroupMappingStatistics,
   ModelGroupMapping,
   ModelGroupStatus,
   ModelKind,
@@ -167,6 +168,14 @@ export interface InvocationAttemptListParams extends AnalyticsRangeParams {
   limit?: number;
 }
 
+export interface ModelGroupMappingStatisticsParams {
+  groupId: number;
+  from: string;
+  to: string;
+  bucket: '1m' | '30m' | '3h' | '12h';
+  signal?: AbortSignal;
+}
+
 interface RequestOptions {
   workspace?: string;
   token?: string;
@@ -187,10 +196,9 @@ type APIKeyResponse = Omit<APIKey, 'modelGroups'> & {
   modelGroups?: APIKey['modelGroups'] | null;
 };
 
-type ModelGroupResponse = Omit<ModelGroup, 'sidecarConfigMode' | 'mappings' | 'uptime'> & {
+type ModelGroupResponse = Omit<ModelGroup, 'sidecarConfigMode' | 'mappings'> & {
   sidecarConfigMode: unknown;
   mappings?: ModelGroupMapping[] | null;
-  uptime?: Uptime | null;
 };
 
 type SidecarTokenResponse = SidecarToken;
@@ -524,6 +532,11 @@ export async function listGroups(): Promise<ModelGroup[]> {
   return itemsOrEmpty(response.items).map(normalizeGroup);
 }
 
+export async function getGroup(id: number): Promise<ModelGroup> {
+  const response = await request<ModelGroupResponse>(`/api/admin/model-groups/${id}`);
+  return normalizeGroup(response);
+}
+
 export async function createGroup(payload: GroupPayload): Promise<ModelGroup> {
   return request<ModelGroup>('/api/admin/model-groups', {
     method: 'POST',
@@ -643,6 +656,20 @@ export async function getAnalyticsSummary(params: InvocationAnalyticsSummaryPara
   if (params.groupId) query.set('groupId', String(params.groupId));
   const suffix = query.toString() ? `?${query}` : '';
   return request<InvocationAnalyticsSummary>(`/api/admin/analytics/summary${suffix}`);
+}
+
+export async function getModelGroupMappingStatistics(
+  params: ModelGroupMappingStatisticsParams
+): Promise<ModelGroupMappingStatistics> {
+  const query = new URLSearchParams();
+  query.set('groupId', String(params.groupId));
+  query.set('from', params.from);
+  query.set('to', params.to);
+  query.set('bucket', params.bucket);
+  return request<ModelGroupMappingStatistics>(
+    `/api/admin/analytics/model-group-mappings?${query}`,
+    { signal: params.signal }
+  );
 }
 
 export async function listInvocationRequests(params: InvocationRequestListParams = {}): Promise<InvocationRequestPage> {
@@ -821,8 +848,9 @@ function normalizeGroup(group: ModelGroupResponse): ModelGroup {
   if (sidecarConfigMode !== 'full' && sidecarConfigMode !== 'reference') {
     throw new Error(`unknown sidecar config mode: ${String(sidecarConfigMode)}`);
   }
+  const { uptime: _legacyUptime, ...groupWithoutLegacyUptime } = group as ModelGroupResponse & { uptime?: unknown };
   return {
-    ...group,
+    ...groupWithoutLegacyUptime,
     firstResponseTimeoutSeconds: positiveIntegerOrDefault(group.firstResponseTimeoutSeconds, 0) || null,
     effectiveFirstResponseTimeoutSeconds: positiveIntegerOrDefault(
       group.effectiveFirstResponseTimeoutSeconds,
@@ -833,8 +861,7 @@ function normalizeGroup(group: ModelGroupResponse): ModelGroup {
     sidecarConfigMode,
     mappings: normalizeGroupMappings(Array.isArray(group.mappings) ? group.mappings : []),
     endpointTotal: Number(group.endpointTotal ?? 0),
-    endpointAvailable: Number(group.endpointAvailable ?? 0),
-    uptime: normalizeUptime(group.uptime)
+    endpointAvailable: Number(group.endpointAvailable ?? 0)
   };
 }
 

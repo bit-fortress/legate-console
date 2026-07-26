@@ -55,6 +55,7 @@ import {
   discoverEndpointModels,
   deleteSidecarToken,
   getAnalyticsSummary,
+  getGroup,
   getSidecarSnapshot,
   getSidecarInstance,
   getWorkspaceSlug,
@@ -142,6 +143,7 @@ import EndpointEditor, { EndpointDetail, type EndpointEditorSubmission } from '.
 import TextProtocolSelector from './TextProtocolSelector';
 import ImageProtocolSelector from './ImageProtocolSelector';
 import { ModelGroupMappingVisualizer } from './ModelGroupMappingVisualizer';
+import ModelGroupDetailPage from './ModelGroupDetailPage';
 import { TEXT_PROTOCOL_CONTRACTS, textProtocolDisplayName } from './textProtocols';
 import { IMAGE_PROTOCOL_CONTRACTS, imageProtocolDisplayName } from './imageProtocols';
 import { AnalyticsAttemptTable, AnalyticsCompletenessBanner, AnalyticsRequestTable, AnalyticsSummaryView, formatNanoUSD } from './AnalyticsViews';
@@ -321,7 +323,15 @@ const PAGE_PATHS: Record<PageKey, string> = {
 };
 
 export function pageKeyForPath(pathname: string): PageKey {
+  if (/^\/groups\/\d+$/.test(pathname)) return 'groups';
   return (Object.entries(PAGE_PATHS).find(([, path]) => path === pathname)?.[0] as PageKey | undefined) ?? 'overview';
+}
+
+export function groupIdForPath(pathname: string): number | null {
+  const match = pathname.match(/^\/groups\/(\d+)$/);
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 export function pathForPageKey(page: PageKey): string {
@@ -340,6 +350,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
   const t = useMemo(() => createTranslator(locale), [locale]);
 
   const [activePage, setActivePage] = useState<PageKey>(() => pageKeyForPath(window.location.pathname));
+  const [groupDetailId, setGroupDetailId] = useState<number | null>(() => groupIdForPath(window.location.pathname));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarCollapsed());
@@ -355,6 +366,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
   const [drivers, setDrivers] = useState<DriverCatalogItem[]>([]);
   const [driverProfiles, setDriverProfiles] = useState<DriverProfile[]>([]);
   const [groups, setGroups] = useState<ModelGroup[]>([]);
+  const [groupDetailLoadError, setGroupDetailLoadError] = useState<'notFound' | 'error' | ''>('');
   const [apiKeys, setAPIKeys] = useState<APIKey[]>([]);
   const [sidecars, setSidecars] = useState<SidecarToken[]>([]);
   const [sidecarView, setSidecarView] = useState<SidecarView>(() => sidecarViewForSearch(window.location.search));
@@ -444,6 +456,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
   useEffect(() => {
     const handlePopState = () => {
       setActivePage(pageKeyForPath(window.location.pathname));
+      setGroupDetailId(groupIdForPath(window.location.pathname));
       setSidecarView(sidecarViewForSearch(window.location.search));
     };
     window.addEventListener('popstate', handlePopState);
@@ -461,7 +474,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
 
   useEffect(() => {
     void refresh();
-  }, [activePage, workspaceSlug, activeAnalyticsRangeSignature, activeSidecarView]);
+  }, [activePage, groupDetailId, workspaceSlug, activeAnalyticsRangeSignature, activeSidecarView]);
 
   useEffect(() => {
     if (!toast) return;
@@ -579,6 +592,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     const requestID = ++refreshRequestRef.current;
     setLoading(true);
     setError('');
+    if (groupDetailId != null) setGroupDetailLoadError('');
     const range = analyticsRangeParams(analyticsRange);
 
     const myWorkspaceResult = await Promise.allSettled([listMyWorkspaces()]).then((results) => results[0]);
@@ -638,7 +652,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     }
 
     const loadEndpoints = readEndpoints && ['overview', 'endpoints', 'groups', 'analytics'].includes(pageForRequest);
-    const loadEndpointGroups = readEndpoints && pageForRequest === 'endpoints';
+    const loadEndpointGroups = readEndpoints && (pageForRequest === 'endpoints' || (pageForRequest === 'groups' && groupDetailId != null));
     const loadDriverCatalog = readEndpointDrivers && ['endpoints', 'drivers', 'groups'].includes(pageForRequest);
     const loadDriverProfiles = readEndpointDrivers && pageForRequest === 'drivers';
     const loadGroups = readGroups && ['overview', 'groups', 'keys'].includes(pageForRequest);
@@ -667,7 +681,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       loadEndpointGroups ? listEndpointGroups() : Promise.resolve([]),
       loadDriverCatalog ? listDrivers() : Promise.resolve([]),
       loadDriverProfiles ? listDriverProfiles() : Promise.resolve([]),
-      loadGroups ? listGroups() : Promise.resolve([]),
+      loadGroups ? (pageForRequest === 'groups' && groupDetailId != null ? getGroup(groupDetailId).then((group) => [group]) : listGroups()) : Promise.resolve([]),
       loadKeys ? listAPIKeys() : Promise.resolve([]),
       loadSidecarTokens ? listSidecarTokens() : Promise.resolve([]),
       loadAnalytics ? getAnalyticsSummary(range) : Promise.resolve(emptySummary),
@@ -681,10 +695,10 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     setHealth(healthResult.status === 'fulfilled' && healthResult.value.ok ? 'ok' : 'failed');
     if (!readEndpoints) setEndpoints([]);
     else if (loadEndpoints && endpointResult.status === 'fulfilled') setEndpoints(endpointResult.value);
-    else if (workspaceChanged) setEndpoints([]);
+    else if (workspaceChanged || (pageForRequest === 'groups' && groupDetailId != null)) setEndpoints([]);
     if (!readEndpoints) setEndpointGroups([]);
     else if (loadEndpointGroups && endpointGroupResult.status === 'fulfilled') setEndpointGroups(endpointGroupResult.value);
-    else if (workspaceChanged) setEndpointGroups([]);
+    else if (workspaceChanged || (pageForRequest === 'groups' && groupDetailId != null)) setEndpointGroups([]);
     if (!readEndpointDrivers) {
       setDrivers([]);
       setDriverProfiles([]);
@@ -695,8 +709,15 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       else if (workspaceChanged) setDriverProfiles([]);
     }
     if (!readGroups) setGroups([]);
-    else if (loadGroups && groupResult.status === 'fulfilled') setGroups(groupResult.value);
-    else if (workspaceChanged) setGroups([]);
+    else if (loadGroups && groupResult.status === 'fulfilled') {
+      setGroups(groupResult.value);
+      if (pageForRequest === 'groups' && groupDetailId != null) setGroupDetailLoadError('');
+    } else if (workspaceChanged || (pageForRequest === 'groups' && groupDetailId != null)) {
+      setGroups([]);
+      if (groupResult.status === 'rejected' && pageForRequest === 'groups' && groupDetailId != null) {
+        setGroupDetailLoadError(groupResult.reason instanceof LegateAPIError && groupResult.reason.status === 404 ? 'notFound' : 'error');
+      }
+    }
     if (!readAPIKeys) setAPIKeys([]);
     else if (loadKeys && keyResult.status === 'fulfilled') setAPIKeys(keyResult.value);
     else if (workspaceChanged) setAPIKeys([]);
@@ -731,7 +752,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       loadEndpointGroups ? endpointGroupResult : null,
       loadDriverCatalog ? driverResult : null,
       loadDriverProfiles ? driverProfileResult : null,
-      loadGroups ? groupResult : null,
+      loadGroups && !(pageForRequest === 'groups' && groupDetailId != null) ? groupResult : null,
       loadKeys ? keyResult : null,
       loadSidecarTokens ? sidecarResult : null,
       loadAnalytics ? summaryResult : null,
@@ -783,11 +804,20 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
 
   function openPage(page: PageKey) {
     setActivePage(page);
+    setGroupDetailId(null);
+    setGroupDetailLoadError('');
     if (page === 'sidecars') setSidecarView('instances');
     const path = pathForPageKey(page);
     if (window.location.pathname !== path || window.location.search) {
       window.history.pushState({}, '', path);
     }
+  }
+
+  function openGroupDetail(id: number) {
+    setActivePage('groups');
+    setGroupDetailId(id);
+    setGroupDetailLoadError('');
+    window.history.pushState({}, '', `/groups/${id}`);
   }
 
   function handleSelfDemoted() {
@@ -1446,7 +1476,24 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
           {activePage === 'overview' && renderOverview()}
           {activePage === 'endpoints' && canReadEndpoints && renderEndpoints()}
           {activePage === 'drivers' && canReadEndpointDrivers && renderDrivers()}
-          {activePage === 'groups' && canReadGroups && renderGroups()}
+          {activePage === 'groups' && canReadGroups && (groupDetailId == null ? renderGroups() : (
+            <ModelGroupDetailPage
+              group={groups.find((group) => group.id === groupDetailId) ?? null}
+              loading={loading}
+              staticError={groupDetailLoadError}
+              endpoints={endpoints}
+              endpointGroups={endpointGroups}
+              workspaceSlug={workspaceSlug}
+              canReadAnalytics={canReadAnalytics}
+              canReadEndpoints={canReadEndpoints}
+              canWriteGroups={canWriteGroups}
+              t={t}
+              onBack={() => openPage('groups')}
+              onRetry={() => void refresh()}
+              onEdit={openGroupModal}
+              onViewEndpoint={openEndpointDetail}
+            />
+          ))}
           {activePage === 'keys' && canReadAPIKeys && renderKeys()}
           {activePage === 'sidecars' && canReadSidecars && renderSidecars()}
           {activePage === 'analytics' && canReadAnalytics && renderAnalytics()}
@@ -1829,7 +1876,6 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                 <th>{t('groups.exposedInvocations')}</th>
                 <th>{t('groups.status')}</th>
                 <th>{t('groups.endpoints')}</th>
-                <th>{t('groups.uptime')}</th>
                 <th>{t('groups.mapping')}</th>
                 {canWriteGroups && <th className="actions-col">{t('actions.edit')}</th>}
               </tr>
@@ -1840,7 +1886,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                   <td><code>#{group.id}</code></td>
                   <td>
                     <div className="stacked">
-                      <strong>{group.name}</strong>
+                      <button type="button" className="table-name-link" onClick={() => openGroupDetail(group.id)}>{group.name}</button>
                       <span>{group.description}</span>
                     </div>
                   </td>
@@ -1850,7 +1896,6 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     : group.inboundProtocolContracts.map((contract) => imageProtocolDisplayName(contract as ImageProtocolContract))} more={0} /></td>
                   <td><StatusBadge label={group.status === 'normal' ? t('status.normal') : t('status.disabled')} tone={group.status === 'normal' ? 'good' : 'muted'} /></td>
                   <td>{group.endpointAvailable}/{group.endpointTotal}</td>
-                  <td><Progress value={group.uptime.percentage} label={formatPercent(group.uptime.percentage)} tone={uptimeTone(group.uptime.percentage)} /></td>
                   <td><TagList values={group.mappings.slice(0, 3).map(mappingLabel)} more={Math.max(0, group.mappings.length - 3)} /></td>
                   {canWriteGroups && (
                     <td>
@@ -2734,7 +2779,9 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                 </div>
               )) : (
                 <ModelGroupMappingVisualizer
+                  mode="edit"
                   groupName={groupDraft.name}
+                  groupKind={groupDraft.kind}
                   mappings={groupDraft.mappings}
                   endpoints={compatibleEndpointsForGroup(groupDraft)}
                   tierLabel={(tier) => routingTierLabel(tier, locale)}
@@ -2749,7 +2796,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     start: t('groups.routeStart'),
                     layer: t('groups.layer'),
                     model: t('groups.model'),
-                    provider: t('groups.provider'),
+                    endpoint: t('groups.endpoint'),
                     tier: t('groups.tier'),
                     weight: t('groups.weight'),
                     addModel: t('groups.addModel'),
@@ -2761,7 +2808,11 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     layerTraffic: t('groups.layerTraffic'),
                     trafficShare: t('groups.trafficShare'),
                     noTraffic: t('groups.noTraffic'),
-                    pendingApply: t('groups.pendingApply')
+                    pendingApply: t('groups.pendingApply'),
+                    endpointGroup: t('endpoints.group'),
+                    schedulable: t('groupDetail.schedulable'),
+                    yes: t('groupDetail.yes'),
+                    no: t('groupDetail.no')
                   }}
                 />
               )}
