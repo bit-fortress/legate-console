@@ -7,6 +7,7 @@ import type {
   ModelGroup,
   ModelGroupMapping,
   ModelGroupMappingStatistic,
+  ModelGroupMappingStatisticsBucket,
   ModelGroupMappingStatistics
 } from './types';
 import { ModelGroupMappingVisualizer, type VisualizerSelection } from './ModelGroupMappingVisualizer';
@@ -366,12 +367,7 @@ function EndpointDetailDrawer({
         </div>
 
         <section className="group-endpoint-drawer-section">
-          <div className="group-endpoint-drawer-section-title">
-            <h3>{t('groupDetail.recentUptime')}</h3>
-            <strong>{runtimePercentage(state, statistic?.uptimePercentage, t)}</strong>
-          </div>
-          <div className="group-uptime-range">{formatWindow(statistics, t)}</div>
-          <UptimeBand statistic={statistic} state={state} t={t} />
+          <EndpointUptime statistic={statistic} statistics={statistics} state={state} t={t} />
           <div className="group-uptime-axis">{windowAxis(statistics, t).map((label, index) => <span key={`${label}:${index}`}>{label}</span>)}</div>
         </section>
 
@@ -382,19 +378,29 @@ function EndpointDetailDrawer({
               <button type="button" className="btn compact" onClick={() => onViewEndpoint(endpoint)}><ExternalLink size={14} /> {t('groupDetail.viewEndpoint')}</button>
             )}
           </div>
-          <dl className="group-endpoint-detail-grid">
-            <Detail label={t('groupDetail.attempts')} value={runtimeCount(state, statistic?.attemptCount, t)} />
-            <Detail label={t('groups.model')} value={mapping.modelId} code />
-            {canReadEndpoints && endpoint && <>
-              <Detail label={t('endpoints.group')} value={endpointGroup?.name ?? `#${endpoint.groupId}`} />
-              <Detail label={t('endpoints.kind')} value={t(`kind.${endpoint.kind}`)} />
-              <Detail label={t('endpoints.status')} value={endpoint.status === 'enabled' ? t('status.enabled') : endpoint.status === 'disabled' ? t('status.disabled') : t('status.error')} />
-              <Detail label={t('endpoints.schedule')} value={endpoint.scheduleEnabled ? t('status.enabled') : t('status.disabled')} />
-              <Detail label={t('groupDetail.price')} value={endpointModel ? `${formatPrice(endpointModel.inputPricePerMillion)} / ${formatPrice(endpointModel.outputPricePerMillion)}` : t('groupDetail.configUnavailable')} />
-              <Detail label={t('endpoints.baseUrl')} value={endpoint.baseUrl} code />
-              <Detail label={t('endpoints.driver')} value={endpoint.driverRef} code />
-            </>}
-          </dl>
+          <div className="group-endpoint-detail-groups">
+            <DetailGroup title={t('groupDetail.runtimeAndRouting')}>
+              <Detail label={t('groupDetail.attempts')} value={runtimeCount(state, statistic?.attemptCount, t)} />
+              {canReadEndpoints && endpoint && <>
+                <Detail label={t('endpoints.group')} value={endpointGroup?.name ?? `#${endpoint.groupId}`} />
+                <Detail label={t('endpoints.status')} value={endpoint.status === 'enabled' ? t('status.enabled') : endpoint.status === 'disabled' ? t('status.disabled') : t('status.error')} />
+                <Detail label={t('endpoints.schedule')} value={endpoint.scheduleEnabled ? t('status.enabled') : t('status.disabled')} />
+              </>}
+            </DetailGroup>
+            <DetailGroup title={t('groupDetail.modelAndPricing')}>
+              <Detail label={t('groups.model')} value={mapping.modelId} code />
+              {canReadEndpoints && endpoint && <>
+                <Detail label={t('endpoints.kind')} value={t(`kind.${endpoint.kind}`)} />
+                <Detail label={t('groupDetail.price')} value={endpointModel ? `${formatPrice(endpointModel.inputPricePerMillion)} / ${formatPrice(endpointModel.outputPricePerMillion)}` : t('groupDetail.configUnavailable')} />
+              </>}
+            </DetailGroup>
+            {canReadEndpoints && endpoint && (
+              <DetailGroup title={t('groupDetail.connection')}>
+                <Detail label={t('endpoints.baseUrl')} value={endpoint.baseUrl} code />
+                <Detail label={t('endpoints.driver')} value={endpoint.driverRef} code />
+              </DetailGroup>
+            )}
+          </div>
           {canReadEndpoints && !endpoint && <div className="notice warning">{t('groupDetail.configUnavailable')}</div>}
         </section>
       </div>
@@ -410,6 +416,53 @@ function Detail({ label, value, code = false }: { label: string; value: string; 
   return <div><dt>{label}</dt><dd title={value}>{code ? <code>{value}</code> : value}</dd></div>;
 }
 
+function DetailGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="group-endpoint-detail-group"><h4>{title}</h4><dl>{children}</dl></section>;
+}
+
+function EndpointUptime({
+  statistic,
+  statistics,
+  state,
+  t
+}: {
+  statistic?: ModelGroupMappingStatistic;
+  statistics: ModelGroupMappingStatistics | null;
+  state: RuntimeState;
+  t: (key: string) => string;
+}) {
+  const [hoveredBucketFrom, setHoveredBucketFrom] = useState<string | null>(null);
+  const [lockedBucketFrom, setLockedBucketFrom] = useState<string | null>(null);
+  const buckets = statistic?.buckets ?? [];
+  const displayedBucket = findBucket(buckets, hoveredBucketFrom) ?? findBucket(buckets, lockedBucketFrom);
+
+  useEffect(() => {
+    setHoveredBucketFrom(null);
+    setLockedBucketFrom(null);
+  }, [statistic, statistics?.window.from, statistics?.window.to]);
+
+  return (
+    <>
+      <div className="group-endpoint-drawer-section-title">
+        <h3>{t('groupDetail.recentUptime')}</h3>
+        <strong>{displayedBucket ? formatPercentage(displayedBucket.uptimePercentage, t) : runtimePercentage(state, statistic?.uptimePercentage, t)}</strong>
+      </div>
+      <div className="group-uptime-range">
+        {displayedBucket ? formatBucketWindow(displayedBucket) : formatWindow(statistics, t)}
+      </div>
+      <UptimeBand
+        statistic={statistic}
+        state={state}
+        t={t}
+        hoveredBucketFrom={hoveredBucketFrom}
+        lockedBucketFrom={lockedBucketFrom}
+        onBucketHover={setHoveredBucketFrom}
+        onBucketLock={(bucketFrom) => setLockedBucketFrom((current) => current === bucketFrom ? null : bucketFrom)}
+      />
+    </>
+  );
+}
+
 function UptimeCell({ statistic, state, t }: { statistic?: ModelGroupMappingStatistic; state: RuntimeState; t: (key: string) => string }) {
   return (
     <div className={`mapping-uptime-cell${state === 'loading' ? ' loading' : ''}`}>
@@ -419,18 +472,64 @@ function UptimeCell({ statistic, state, t }: { statistic?: ModelGroupMappingStat
   );
 }
 
-function UptimeBand({ statistic, state, t, compact = false }: { statistic?: ModelGroupMappingStatistic; state: RuntimeState; t: (key: string) => string; compact?: boolean }) {
+function UptimeBand({
+  statistic,
+  state,
+  t,
+  compact = false,
+  hoveredBucketFrom = null,
+  lockedBucketFrom = null,
+  onBucketHover,
+  onBucketLock
+}: {
+  statistic?: ModelGroupMappingStatistic;
+  state: RuntimeState;
+  t: (key: string) => string;
+  compact?: boolean;
+  hoveredBucketFrom?: string | null;
+  lockedBucketFrom?: string | null;
+  onBucketHover?: (bucketFrom: string | null) => void;
+  onBucketLock?: (bucketFrom: string) => void;
+}) {
   const buckets = statistic?.buckets ?? [];
   const showBuckets = state === 'ready' && buckets.length > 0;
   return (
-    <div className={`mapping-uptime-buckets${compact ? ' compact' : ''}${state === 'loading' ? ' loading' : ''}`} aria-label={t('groupDetail.uptimeBuckets')}>
+    <div
+      className={`mapping-uptime-buckets${compact ? ' compact' : ' interactive'}${state === 'loading' ? ' loading' : ''}`}
+      aria-label={t('groupDetail.uptimeBuckets')}
+      onMouseLeave={compact ? undefined : () => onBucketHover?.(null)}
+    >
       {showBuckets && buckets.map((bucket) => {
         const label = `${formatBucketTime(bucket.from)} - ${formatBucketTime(bucket.to)}: ${bucket.availableAttemptCount}/${bucket.attemptCount}, ${formatPercentage(bucket.uptimePercentage, t)}`;
-        return <span key={bucket.from} tabIndex={0} className={bucketTone(bucket.uptimePercentage)} title={label} aria-label={label} />;
+        if (compact) return <span key={bucket.from} tabIndex={0} className={bucketTone(bucket.uptimePercentage)} title={label} aria-label={label} />;
+        const hovered = hoveredBucketFrom === bucket.from;
+        const locked = lockedBucketFrom === bucket.from;
+        return (
+          <button
+            key={bucket.from}
+            type="button"
+            className={`${bucketTone(bucket.uptimePercentage)}${hovered ? ' hovered' : ''}${locked ? ' locked' : ''}`}
+            title={label}
+            aria-label={label}
+            aria-pressed={locked}
+            onMouseEnter={() => onBucketHover?.(bucket.from)}
+            onFocus={() => onBucketHover?.(bucket.from)}
+            onBlur={() => onBucketHover?.(null)}
+            onClick={() => onBucketLock?.(bucket.from)}
+          />
+        );
       })}
       {!showBuckets && Array.from({ length: 48 }, (_, index) => <span key={index} className="empty" />)}
     </div>
   );
+}
+
+function findBucket(buckets: ModelGroupMappingStatisticsBucket[], from: string | null): ModelGroupMappingStatisticsBucket | undefined {
+  return from ? buckets.find((bucket) => bucket.from === from) : undefined;
+}
+
+function formatBucketWindow(bucket: ModelGroupMappingStatisticsBucket): string {
+  return `${formatBucketTime(bucket.from)} - ${formatBucketTime(bucket.to)}`;
 }
 
 function compareMappings(left: ModelGroupMapping, right: ModelGroupMapping): number {

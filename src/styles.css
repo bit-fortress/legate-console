@@ -4307,11 +4307,42 @@ a {
   height: 34px;
 }
 
-.mapping-uptime-buckets span {
+.mapping-uptime-buckets span,
+.mapping-uptime-buckets button {
+  position: relative;
   min-width: 3px;
   height: 34px;
+  padding: 0;
+  border: 0;
   border-radius: 0;
   background: var(--border-strong);
+}
+
+.mapping-uptime-buckets.interactive {
+  height: 43px;
+  padding-top: 9px;
+}
+
+.mapping-uptime-buckets.interactive button {
+  cursor: pointer;
+}
+
+.mapping-uptime-buckets.interactive button.hovered::before {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  content: '';
+  transform: translateX(-50%);
+}
+
+.mapping-uptime-buckets.interactive button.locked {
+  z-index: 1;
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 .mapping-uptime-buckets.compact {
@@ -4328,16 +4359,17 @@ a {
   height: 16px;
 }
 
-.mapping-uptime-buckets span.good { background: var(--green); }
-.mapping-uptime-buckets span.warning { background: var(--yellow); }
-.mapping-uptime-buckets span.bad { background: var(--red); }
+.mapping-uptime-buckets .good { background: var(--green); }
+.mapping-uptime-buckets .warning { background: var(--yellow); }
+.mapping-uptime-buckets .bad { background: var(--red); }
 .mapping-uptime-buckets span.empty {
   background: var(--border-strong);
 }
 
 .mapping-uptime-buckets.loading { opacity: .55; }
 
-.mapping-uptime-buckets span:focus-visible {
+.mapping-uptime-buckets span:focus-visible,
+.mapping-uptime-buckets button:focus-visible {
   outline: 2px solid var(--text);
   outline-offset: 1px;
 }
@@ -4411,27 +4443,48 @@ a {
   color: var(--green);
 }
 
-.group-endpoint-detail-grid {
+.group-endpoint-detail-groups {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 28px;
+  gap: 0;
+}
+
+.group-endpoint-detail-group {
+  padding: 4px 0 16px;
+}
+
+.group-endpoint-detail-group + .group-endpoint-detail-group {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.group-endpoint-detail-group:last-child {
+  padding-bottom: 0;
+}
+
+.group-endpoint-detail-group h4 {
+  margin: 0 0 7px;
+  color: var(--text);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.group-endpoint-detail-group dl {
   margin: 0;
 }
 
-.group-endpoint-detail-grid > div {
+.group-endpoint-detail-group dl > div {
   display: grid;
-  grid-template-columns: minmax(100px, .7fr) minmax(0, 1.3fr);
-  gap: 5px;
+  grid-template-columns: minmax(140px, .7fr) minmax(0, 1.3fr);
+  gap: 16px;
   align-items: baseline;
   min-width: 0;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
 }
 
-.group-endpoint-detail-grid dt,
-.group-endpoint-detail-grid dd { margin: 0; }
-.group-endpoint-detail-grid dt { color: var(--text-muted); font-size: 12px; }
-.group-endpoint-detail-grid dd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.group-endpoint-detail-group dt,
+.group-endpoint-detail-group dd { margin: 0; }
+.group-endpoint-detail-group dt { color: var(--text-muted); font-size: 12px; }
+.group-endpoint-detail-group dd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
 
 .group-endpoint-drawer-section {
   padding: 22px 0;
@@ -4624,7 +4677,7 @@ a {
   .group-detail-workspace { padding-top: 16px; }
   .group-detail-nav { overflow-x: auto; grid-template-columns: repeat(3, minmax(112px, 1fr)); padding-bottom: 2px; }
   .group-endpoint-detail-metrics { gap: 7px; }
-  .group-endpoint-detail-grid { grid-template-columns: 1fr; }
+  .group-endpoint-detail-group dl > div { grid-template-columns: minmax(112px, .7fr) minmax(0, 1.3fr); }
   .group-endpoint-drawer-header { min-height: 64px; padding: 15px 16px; }
   .group-endpoint-drawer-body { padding: 16px; }
   .group-uptime-panel { padding: 14px; }
@@ -4633,7 +4686,9 @@ a {
   .group-uptime-chart-empty { left: 38px; }
   .group-uptime-panel > .group-uptime-axis { margin-left: 38px; }
   .mapping-uptime-buckets { gap: 1px; height: 28px; }
-  .mapping-uptime-buckets span { height: 28px; }
+  .mapping-uptime-buckets.interactive { height: 37px; }
+  .mapping-uptime-buckets span,
+  .mapping-uptime-buckets button { height: 28px; }
 }
 
 .field-help {

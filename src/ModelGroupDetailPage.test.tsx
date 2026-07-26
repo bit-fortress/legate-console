@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ModelGroupDetailPage from './ModelGroupDetailPage';
@@ -101,6 +101,57 @@ describe('ModelGroupDetailPage', () => {
     expect(screen.getByRole('button', { name: '关闭 Endpoint 详情' })).toBeInTheDocument();
     expect(screen.getByText('Endpoint Uptime')).toBeInTheDocument();
     expect(onViewEndpoint).not.toHaveBeenCalled();
+  });
+
+  it('previews and locks endpoint uptime buckets', async () => {
+    const sampled = statistics();
+    sampled.mappings[0].uptimePercentage = 90;
+    sampled.mappings[0].buckets = [
+      { from: '2026-07-26T00:00:00Z', to: '2026-07-26T00:01:00Z', availableAttemptCount: 1, attemptCount: 4, uptimePercentage: 25 },
+      { from: '2026-07-26T00:01:00Z', to: '2026-07-26T00:02:00Z', availableAttemptCount: 4, attemptCount: 5, uptimePercentage: 80 }
+    ];
+    vi.mocked(api.getModelGroupMappingStatistics).mockResolvedValue(sampled);
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(api.getModelGroupMappingStatistics).toHaveBeenCalled());
+    await user.click(screen.getByRole('row', { name: /OpenAI Text/ }));
+
+    const drawer = screen.getByRole('complementary', { name: 'OpenAI Text' });
+    const uptimeSection = within(drawer).getByRole('heading', { name: 'Endpoint Uptime' }).closest('section')!;
+    const band = within(uptimeSection).getByLabelText('Uptime 时间分桶');
+    const buckets = within(band).getAllByRole('button');
+    const range = uptimeSection.querySelector('.group-uptime-range')!;
+    const overallRange = range.textContent;
+
+    expect(uptimeSection.querySelector('.group-endpoint-drawer-section-title strong')).toHaveTextContent('90%');
+    await user.hover(buckets[0]);
+    expect(buckets[0]).toHaveClass('hovered');
+    expect(uptimeSection.querySelector('.group-endpoint-drawer-section-title strong')).toHaveTextContent('25%');
+    expect(range.textContent).not.toBe(overallRange);
+
+    await user.click(buckets[0]);
+    expect(buckets[0]).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.mouseLeave(band);
+    expect(uptimeSection.querySelector('.group-endpoint-drawer-section-title strong')).toHaveTextContent('25%');
+
+    await user.hover(buckets[1]);
+    expect(uptimeSection.querySelector('.group-endpoint-drawer-section-title strong')).toHaveTextContent('80%');
+    fireEvent.mouseLeave(band);
+    expect(uptimeSection.querySelector('.group-endpoint-drawer-section-title strong')).toHaveTextContent('25%');
+  });
+
+  it('groups endpoint configuration into single-column sections', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(api.getModelGroupMappingStatistics).toHaveBeenCalled());
+    await user.click(screen.getByRole('row', { name: /OpenAI Text/ }));
+
+    const drawer = screen.getByRole('complementary', { name: 'OpenAI Text' });
+    expect(within(drawer).getByRole('heading', { name: '运行与路由' })).toBeInTheDocument();
+    expect(within(drawer).getByRole('heading', { name: '模型与价格' })).toBeInTheDocument();
+    expect(within(drawer).getByRole('heading', { name: '连接信息' })).toBeInTheDocument();
+    expect(drawer.querySelectorAll('.group-endpoint-detail-group')).toHaveLength(3);
+    expect(drawer.querySelector('.group-endpoint-detail-grid')).not.toBeInTheDocument();
   });
 
   it('links readonly routing selection to the same endpoint drawer', async () => {
