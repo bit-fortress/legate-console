@@ -183,9 +183,10 @@ interface DriverUploadDraft {
   manifestError: string;
 }
 
-interface GroupDraft extends Omit<GroupPayload, 'firstResponseTimeoutSeconds'> {
+interface GroupDraft extends Omit<GroupPayload, 'firstResponseTimeoutSeconds' | 'mappings'> {
   id?: number;
   firstResponseTimeoutSeconds: string;
+  mappings: ModelGroupMapping[];
 }
 
 interface EndpointGroupDraft extends EndpointGroupPayload {
@@ -935,7 +936,13 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       routingMode: groupDraft.routingMode,
       sidecarConfigMode: groupDraft.sidecarConfigMode,
       inboundProtocolContracts: groupDraft.kind === 'video' ? [] : groupDraft.inboundProtocolContracts,
-      mappings
+      mappings: mappings.map((mapping) => ({
+        endpointId: mapping.endpointId,
+        modelId: mapping.modelId,
+        tier: mapping.tier ?? 0,
+        weight: mapping.weight ?? 100,
+        sortOrder: mapping.sortOrder ?? 0
+      }))
     };
     await runAction(async () => {
       if (groupDraft.id) await updateGroup(groupDraft.id, payload);

@@ -29,6 +29,7 @@ import {
   updateEndpoint,
   updateEndpointGroup,
   updateEndpointSchedule,
+  updateGroup,
   uploadDriverProfile
 } from './api';
 import type { CreateEndpointPayload, EndpointGroupPayload, GroupPayload } from './api';
@@ -197,8 +198,10 @@ describe('endpoint API client', () => {
     expect(new Headers((init as RequestInit).headers).has('Content-Type')).toBe(false);
   });
 
-  it('serializes model group mappings with endpointId and the new capability fields', async () => {
-    fetchMock.mockResolvedValue(response(modelGroup(), 201));
+  it('serializes only model group command fields when editing response mappings', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response(modelGroup(), 201))
+      .mockResolvedValueOnce(response(modelGroup()));
     const payload: GroupPayload = {
       name: 'chat',
       kind: 'text',
@@ -217,6 +220,17 @@ describe('endpoint API client', () => {
     expect(body.mappings[0]).not.toHaveProperty('providerId');
     expect(body).toMatchObject({ inboundProtocolContracts: ['openai.chat_completions/2026-07-18'] });
     expect(body.firstResponseTimeoutSeconds).toBeNull();
+
+    const responseMapping = { ...payload.mappings[0], id: 1, groupId: 3 };
+    await updateGroup(3, { ...payload, mappings: [responseMapping] });
+    const updateBody = JSON.parse(String((requestAt(1)[1] as RequestInit).body));
+    expect(updateBody.mappings[0]).toEqual({
+      endpointId: 101,
+      modelId: 'gpt-5',
+      tier: 0,
+      weight: 100,
+      sortOrder: 1
+    });
   });
 
   it('normalizes model group summaries from endpoint totals', async () => {

@@ -96,7 +96,15 @@ export interface GroupPayload {
   routingMode: RoutingMode;
   sidecarConfigMode: SidecarConfigMode;
   inboundProtocolContracts: InboundProtocolContract[];
-  mappings: ModelGroupMapping[];
+  mappings: ModelGroupMappingPayload[];
+}
+
+export interface ModelGroupMappingPayload {
+  endpointId: number;
+  modelId: string;
+  tier: number;
+  weight: number;
+  sortOrder: number;
 }
 
 export interface APIKeyPayload {
@@ -519,15 +527,35 @@ export async function listGroups(): Promise<ModelGroup[]> {
 export async function createGroup(payload: GroupPayload): Promise<ModelGroup> {
   return request<ModelGroup>('/api/admin/model-groups', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(groupCommand(payload))
   });
 }
 
 export async function updateGroup(id: number, payload: GroupPayload): Promise<ModelGroup> {
   return request<ModelGroup>(`/api/admin/model-groups/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(groupCommand(payload))
   });
+}
+
+function groupCommand(payload: GroupPayload): GroupPayload {
+  return {
+    name: payload.name,
+    kind: payload.kind,
+    description: payload.description,
+    status: payload.status,
+    firstResponseTimeoutSeconds: payload.firstResponseTimeoutSeconds,
+    routingMode: payload.routingMode,
+    sidecarConfigMode: payload.sidecarConfigMode,
+    inboundProtocolContracts: payload.inboundProtocolContracts,
+    mappings: payload.mappings.map((mapping) => ({
+      endpointId: mapping.endpointId,
+      modelId: mapping.modelId,
+      tier: mapping.tier,
+      weight: mapping.weight,
+      sortOrder: mapping.sortOrder
+    }))
+  };
 }
 
 export async function deleteGroup(id: number): Promise<void> {
