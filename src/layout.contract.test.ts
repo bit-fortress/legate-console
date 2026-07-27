@@ -62,6 +62,13 @@ describe('layout contracts', () => {
     expect(unitRule).not.toContain('background:');
   });
 
+  it('aligns text model pricing status at the right edge of the model column', () => {
+    const pricingCellRule = endpointCssRule('.endpoint-model-pricing-cell');
+
+    expect(pricingCellRule).toContain('flex: 1');
+    expect(pricingCellRule).toContain('justify-content: space-between');
+  });
+
   it('explains endpoint model incompatibility in both supported languages', () => {
     expect(dictionaryFor('zh')['groups.incompatible.driver_kind']).toBe('驱动类型不匹配');
     expect(dictionaryFor('en')['groups.incompatible.driver_kind']).toBe('Driver kind does not match');
