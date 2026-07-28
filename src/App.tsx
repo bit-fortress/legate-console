@@ -1570,18 +1570,13 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
         )}
 
         <div className="overview-grid">
-          <section className="panel hero-panel">
+          <section className="panel">
             <div className="panel-head">
               <div>
                 <span>{t('overview.health')}</span>
                 <h2>{health === 'ok' ? t('app.connected') : t('app.disconnected')}</h2>
               </div>
               <StatusBadge label={health === 'ok' ? t('status.available') : t('status.unavailable')} tone={healthClass} />
-            </div>
-            <div className="sparkline" aria-hidden="true">
-              {sparkPoints(canReadAnalytics ? requests : []).map((height, index) => (
-                <span key={index} style={{ height: `${height}%` }} />
-              ))}
             </div>
             <div className="hero-stats">
               {canReadEndpoints && <StatPill label={t('overview.endpoints')} value={String(endpoints.length)} />}
@@ -4261,13 +4256,4 @@ function analyticsAvailability(summary: InvocationAnalyticsSummary): number {
   return summary.attempts.count > 0
     ? (summary.attempts.availableCount * 100) / summary.attempts.count
     : 0;
-}
-
-function sparkPoints(records: InvocationRequest[]): number[] {
-  const buckets = Array.from({ length: 24 }, () => 8);
-  records.slice(0, 72).forEach((record, index) => {
-    const bucket = index % buckets.length;
-    buckets[bucket] = Math.min(96, buckets[bucket] + (record.outcome === 'success' ? 8 : 3));
-  });
-  return buckets;
 }

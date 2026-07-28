@@ -1218,6 +1218,10 @@ a {
   gap: 10px;
 }
 
+.overview-grid {
+  align-items: start;
+}
+
 .panel {
   min-width: 0;
   padding: 12px 14px;
@@ -1272,32 +1276,6 @@ a {
 .panel-head h2 {
   font-size: 15px;
   font-weight: 680;
-}
-
-.hero-panel {
-  overflow: hidden;
-}
-
-.sparkline {
-  display: grid;
-  height: 120px;
-  grid-template-columns: repeat(24, minmax(6px, 1fr));
-  align-items: end;
-  gap: 3px;
-  margin: 6px 0 12px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent 70%),
-    var(--panel-soft);
-}
-
-.sparkline span {
-  min-height: 8px;
-  border-radius: 2px 2px 0 0;
-  background: linear-gradient(180deg, var(--primary-strong), var(--primary));
-  opacity: 0.85;
 }
 
 .hero-stats {
