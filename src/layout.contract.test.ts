@@ -217,8 +217,12 @@ describe('layout contracts', () => {
     expect(appSource).toContain("t('groups.tier')");
     expect(appSource).toContain("t('groups.weight')");
     expect(appSource).toContain("label={t('groups.sidecarConfigMode')}");
-    expect(appSource).toContain("value: 'full', label: t('groups.sidecarConfigFull')");
+    expect(appSource).toContain("sidecarConfigMode: group?.sidecarConfigMode ?? 'reference'");
+    expect(appSource).toMatch(/value: 'full',\s+label: t\('groups\.sidecarConfigFull'\)/);
+    expect(appSource).toContain("endAdornment: !groupDraft.id ? (");
+    expect(appSource).toContain("<WarningTooltip label={t('groups.sidecarConfigWarning')} />");
     expect(appSource).toContain("value: 'reference', label: t('groups.sidecarConfigReference')");
+    expect(stylesSource).toContain('.select-option-tooltip');
     expect(cssRule('.mapping-delete-button')).toContain('margin-top: 22px');
   });
 

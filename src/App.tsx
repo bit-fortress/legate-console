@@ -907,7 +907,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
         ? ''
         : String(group.firstResponseTimeoutSeconds),
       routingMode: group?.routingMode ?? 'tiered_failover',
-      sidecarConfigMode: group?.sidecarConfigMode ?? 'full',
+      sidecarConfigMode: group?.sidecarConfigMode ?? 'reference',
       inboundProtocolContracts: group?.inboundProtocolContracts?.length
         ? [...group.inboundProtocolContracts]
         : kind === 'text' ? [...TEXT_PROTOCOL_CONTRACTS] : kind === 'image' ? [...IMAGE_PROTOCOL_CONTRACTS] : [],
@@ -2680,8 +2680,14 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
               value={groupDraft.sidecarConfigMode}
               onChange={(value) => setGroupDraft({ ...groupDraft, sidecarConfigMode: value as GroupDraft['sidecarConfigMode'] })}
               options={[
-                { value: 'full', label: t('groups.sidecarConfigFull') },
-                { value: 'reference', label: t('groups.sidecarConfigReference') }
+                { value: 'reference', label: t('groups.sidecarConfigReference') },
+                {
+                  value: 'full',
+                  label: t('groups.sidecarConfigFull'),
+                  endAdornment: !groupDraft.id ? (
+                    <WarningTooltip label={t('groups.sidecarConfigWarning')} />
+                  ) : undefined
+                }
               ]}
             />
           </div>
@@ -3192,6 +3198,40 @@ function Progress({ value, label, tone }: { value: number; label?: string; tone:
       </div>
       {label && <small>{label}</small>}
     </div>
+  );
+}
+
+function WarningTooltip({ label }: { label: string }) {
+  const tooltipID = useId();
+  const [style, setStyle] = useState<CSSProperties | null>(null);
+
+  function showTooltip(element: HTMLElement) {
+    const rect = element.getBoundingClientRect();
+    const width = Math.min(320, window.innerWidth - 16);
+    const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8);
+    const verticalStyle = window.innerHeight - rect.bottom >= 72
+      ? { top: rect.bottom + 6 }
+      : { bottom: window.innerHeight - rect.top + 6 };
+    setStyle({ position: 'fixed', width, left, ...verticalStyle });
+  }
+
+  return (
+    <>
+      <span
+        className="select-option-warning"
+        role="img"
+        aria-label={label}
+        aria-describedby={tooltipID}
+        onMouseEnter={(event) => showTooltip(event.currentTarget)}
+        onMouseLeave={() => setStyle(null)}
+      >
+        <CircleAlert size={16} aria-hidden="true" />
+      </span>
+      {style && createPortal(
+        <span className="select-option-tooltip" role="tooltip" id={tooltipID} style={style}>{label}</span>,
+        document.body
+      )}
+    </>
   );
 }
 

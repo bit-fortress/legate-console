@@ -267,6 +267,72 @@ describe('App endpoint permissions and flows', () => {
     })));
   });
 
+  it('defaults new model groups to central forwarding and warns on the Sidecar option', async () => {
+    const user = userEvent.setup();
+    const warning = '该方式会将模型供应商的配置信息全量下发至 Sidecar 上，请确保 Sidecar 处于可信环境中';
+    window.history.replaceState({}, '', '/groups');
+    mockWorkspace(['model_groups:read', 'model_groups:write', 'endpoints:read', 'endpoint_drivers:read']);
+    renderApp();
+
+    await user.click(await screen.findByRole('button', { name: '添加模型组' }));
+    const dialog = screen.getByRole('dialog', { name: '添加模型组' });
+    const forwardingSelect = within(dialog).getByRole('button', { name: 'Sidecar 配置下发' });
+    expect(forwardingSelect).toHaveTextContent('仅引用（转发到中心节点）');
+
+    await user.click(forwardingSelect);
+    const options = screen.getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([
+      '仅引用（转发到中心节点）',
+      '完整下发（Sidecar 本地转发）'
+    ]);
+    const warningIcon = screen.getByRole('img', { name: warning });
+    expect(warningIcon).toHaveClass('select-option-warning');
+    expect(warningIcon.closest('[role="option"]')).toHaveTextContent('完整下发（Sidecar 本地转发）');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(warningIcon);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(warning);
+
+    fireEvent.mouseLeave(warningIcon);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('keeps an existing model group forwarding mode without the create-only warning', async () => {
+    const user = userEvent.setup();
+    const warning = '该方式会将模型供应商的配置信息全量下发至 Sidecar 上，请确保 Sidecar 处于可信环境中';
+    const existingGroup: ModelGroup = {
+      id: 3,
+      workspaceId: 1,
+      name: 'chat',
+      description: 'Primary route',
+      kind: 'text',
+      status: 'normal',
+      firstResponseTimeoutSeconds: null,
+      effectiveFirstResponseTimeoutSeconds: 180,
+      routingMode: 'tiered_failover',
+      sidecarConfigMode: 'full',
+      inboundProtocolContracts: ['openai.chat_completions/2026-07-18'],
+      mappings: [{ id: 41, groupId: 3, endpointId: 101, modelId: 'gpt-5', tier: 0, weight: 100, sortOrder: 0 }],
+      endpointTotal: 1,
+      endpointAvailable: 1,
+      createdAt: '',
+      updatedAt: ''
+    };
+    window.history.replaceState({}, '', '/groups');
+    vi.mocked(api.listGroups).mockResolvedValue([existingGroup]);
+    mockWorkspace(['model_groups:read', 'model_groups:write', 'endpoints:read', 'endpoint_drivers:read']);
+    renderApp();
+
+    const row = await screen.findByRole('row', { name: /chat/ });
+    await user.click(within(row).getByRole('button', { name: '编辑' }));
+    const dialog = screen.getByRole('dialog', { name: '编辑' });
+    const forwardingSelect = within(dialog).getByRole('button', { name: 'Sidecar 配置下发' });
+    expect(forwardingSelect).toHaveTextContent('完整下发（Sidecar 本地转发）');
+
+    await user.click(forwardingSelect);
+    expect(screen.queryByRole('img', { name: warning })).not.toBeInTheDocument();
+  });
+
   it('keeps mapping creation in a list toolbar and reorders tiers only after blur', async () => {
     const user = userEvent.setup();
     window.history.replaceState({}, '', '/groups');

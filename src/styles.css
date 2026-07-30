@@ -2777,6 +2777,36 @@ a {
   white-space: nowrap;
 }
 
+.select-option .select-option-end {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  overflow: visible;
+}
+
+.select-option-warning {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--yellow);
+}
+
+.select-option-tooltip {
+  z-index: 240;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--panel-solid);
+  box-shadow: var(--shadow);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: normal;
+}
+
 .select-value .driver-name-with-alias,
 .select-option .driver-name-with-alias {
   display: flex;

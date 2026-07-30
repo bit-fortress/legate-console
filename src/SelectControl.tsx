@@ -7,6 +7,7 @@ export interface SelectOption {
   label: ReactNode;
   textLabel?: string;
   className?: string;
+  endAdornment?: ReactNode;
 }
 
 interface SelectControlProps {
@@ -166,7 +167,12 @@ export function SelectControl({
                 }}
               >
                 <span>{option.label}</span>
-                {active && <Check size={14} aria-hidden="true" />}
+                {(option.endAdornment || active) && (
+                  <span className="select-option-end">
+                    {option.endAdornment}
+                    {active && <Check size={14} aria-hidden="true" />}
+                  </span>
+                )}
               </button>
             );
           })}
