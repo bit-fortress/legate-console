@@ -360,6 +360,22 @@ export interface ModelGroupMappingStatistics {
   completeness: InvocationAnalyticsCompleteness;
 }
 
+export interface ModelGroupUptimeSummary {
+  groupId: number;
+  availableAttemptCount: number;
+  attemptCount: number;
+  uptimePercentage: number | null;
+}
+
+export interface ModelGroupUptimeSummaryList {
+  window: {
+    from: string;
+    to: string;
+  };
+  items: ModelGroupUptimeSummary[];
+  completeness: InvocationAnalyticsCompleteness;
+}
+
 export interface APIKeyModelGroup {
   groupId: number;
   groupName: string;

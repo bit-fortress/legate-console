@@ -1390,6 +1390,10 @@ a {
   background: color-mix(in srgb, var(--primary-soft) 42%, transparent);
 }
 
+.group-uptime-summary-cell {
+  min-width: 112px;
+}
+
 .analytics-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -11,6 +11,7 @@ import {
   getAnalyticsSummary,
   getGroup,
   getModelGroupMappingStatistics,
+  getModelGroupUptimeSummaries,
   getDriverProfile,
   getEndpoint,
   getEndpointGroup,
@@ -269,14 +270,20 @@ describe('endpoint API client', () => {
     expect(result.group.historicalOnlyAttemptCount).toBe(0);
   });
 
-  it('uses only the three V1 analytics routes with stable typed query ordering', async () => {
+  it('uses the canonical analytics routes with stable typed query ordering', async () => {
     fetchMock
       .mockResolvedValueOnce(response(analyticsSummaryResponse()))
+      .mockResolvedValueOnce(response({
+        window: { from: '2026-07-17T00:00:00.000Z', to: '2026-07-17T01:00:00.000Z' },
+        items: [],
+        completeness: analyticsSummaryResponse().completeness
+      }))
       .mockResolvedValueOnce(response({ items: [], nextCursor: null }))
       .mockResolvedValueOnce(response({ items: [], nextCursor: null }));
     const range = { from: '2026-07-17T00:00:00.000Z', to: '2026-07-17T01:00:00.000Z' };
 
     await getAnalyticsSummary({ ...range, groupId: 3 });
+    await getModelGroupUptimeSummaries(range);
     await listInvocationRequests({
       ...range,
       groupId: 3,
@@ -297,8 +304,9 @@ describe('endpoint API client', () => {
     });
 
     expect(requestAt(0)[0]).toBe('/api/admin/analytics/summary?from=2026-07-17T00%3A00%3A00.000Z&to=2026-07-17T01%3A00%3A00.000Z&groupId=3');
-    expect(requestAt(1)[0]).toBe('/api/admin/analytics/requests?from=2026-07-17T00%3A00%3A00.000Z&to=2026-07-17T01%3A00%3A00.000Z&groupId=3&outcome=client_error&role=origin&rootRequestId=root-1&cursor=cursor%2B%2F%3D&limit=20');
-    expect(requestAt(2)[0]).toBe('/api/admin/analytics/attempts?from=2026-07-17T00%3A00%3A00.000Z&to=2026-07-17T01%3A00%3A00.000Z&groupId=3&endpointId=101&outcome=upstream_error&rootRequestId=root-1&cursor=cursor%2B%2F%3D&limit=40');
+    expect(requestAt(1)[0]).toBe('/api/admin/analytics/model-groups?from=2026-07-17T00%3A00%3A00.000Z&to=2026-07-17T01%3A00%3A00.000Z');
+    expect(requestAt(2)[0]).toBe('/api/admin/analytics/requests?from=2026-07-17T00%3A00%3A00.000Z&to=2026-07-17T01%3A00%3A00.000Z&groupId=3&outcome=client_error&role=origin&rootRequestId=root-1&cursor=cursor%2B%2F%3D&limit=20');
+    expect(requestAt(3)[0]).toBe('/api/admin/analytics/attempts?from=2026-07-17T00%3A00%3A00.000Z&to=2026-07-17T01%3A00%3A00.000Z&groupId=3&endpointId=101&outcome=upstream_error&rootRequestId=root-1&cursor=cursor%2B%2F%3D&limit=40');
   });
 
   it('preserves nullable V1 summary measurements, known zero, and large decimal cost', async () => {

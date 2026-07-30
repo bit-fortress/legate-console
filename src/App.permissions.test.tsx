@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import * as api from './api';
-import type { DriverCatalogItem, DriverProfile, Endpoint, EndpointGroup, InvocationAnalyticsSummary, InvocationAttempt, ModelGroup, ModelGroupMappingStatistics, ModelKind, WorkspaceAccess } from './types';
+import type { DriverCatalogItem, DriverProfile, Endpoint, EndpointGroup, InvocationAnalyticsSummary, InvocationAttempt, ModelGroup, ModelGroupMappingStatistics, ModelGroupUptimeSummaryList, ModelKind, WorkspaceAccess } from './types';
 
 vi.mock('./api', () => ({
   LegateAPIError: class LegateAPIError extends Error {
@@ -34,6 +34,7 @@ vi.mock('./api', () => ({
   getAnalyticsSummary: vi.fn(),
   getGroup: vi.fn(),
   getModelGroupMappingStatistics: vi.fn(),
+  getModelGroupUptimeSummaries: vi.fn(),
   getSidecarInstance: vi.fn(),
   getSidecarSnapshot: vi.fn(),
   getWorkspaceSlug: vi.fn(() => 'workspace-alpha'),
@@ -128,6 +129,7 @@ describe('App endpoint permissions and flows', () => {
     vi.mocked(api.listInvocationRequests).mockResolvedValue({ items: [], nextCursor: null });
     vi.mocked(api.getAnalyticsSummary).mockResolvedValue(analyticsSummaryFixture());
     vi.mocked(api.getModelGroupMappingStatistics).mockResolvedValue(modelGroupStatisticsFixture());
+    vi.mocked(api.getModelGroupUptimeSummaries).mockResolvedValue(modelGroupUptimeFixture());
     vi.mocked(api.listWorkspaces).mockResolvedValue([]);
     vi.mocked(api.createEndpoint).mockResolvedValue(endpoints[0]);
   });
@@ -356,6 +358,33 @@ describe('App endpoint permissions and flows', () => {
     await user.tab();
     tierInputs = within(dialog).getAllByRole('spinbutton', { name: '层级' });
     expect(tierInputs.map((input) => (input as HTMLInputElement).value)).toEqual(['0', '2']);
+  });
+
+  it('shows the last-hour uptime for every model group in the outer list', async () => {
+    window.history.replaceState({}, '', '/groups');
+    vi.mocked(api.listGroups).mockResolvedValue([modelGroupFixture()]);
+    mockWorkspace(['model_groups:read', 'analytics:read']);
+
+    renderApp();
+
+    const row = await screen.findByRole('row', { name: /chat/ });
+    expect(screen.getByRole('columnheader', { name: '可用率' })).toHaveAttribute('title', '最近 1 小时');
+    expect(within(row).getByText('75%')).toBeInTheDocument();
+    await waitFor(() => expect(api.getModelGroupUptimeSummaries).toHaveBeenCalledTimes(1));
+    const range = vi.mocked(api.getModelGroupUptimeSummaries).mock.calls[0][0]!;
+    expect(new Date(range.to!).getTime() - new Date(range.from!).getTime()).toBe(60 * 60 * 1000);
+  });
+
+  it('keeps the uptime column visible without exposing analytics to a model-group viewer', async () => {
+    window.history.replaceState({}, '', '/groups');
+    vi.mocked(api.listGroups).mockResolvedValue([modelGroupFixture()]);
+    mockWorkspace(['model_groups:read']);
+
+    renderApp();
+
+    const row = await screen.findByRole('row', { name: /chat/ });
+    expect(within(row).getByText('无查看权限')).toBeInTheDocument();
+    expect(api.getModelGroupUptimeSummaries).not.toHaveBeenCalled();
   });
 
   it('loads a model group detail URL directly with the dedicated group and analytics contracts', async () => {
@@ -837,6 +866,35 @@ function modelGroupStatisticsFixture(): ModelGroupMappingStatistics {
       p50TimeToFirstOutputMs: 20, timeToFirstOutputSampleCount: 1, p50TokensPerSecond: 50, tokensPerSecondSampleCount: 1,
       buckets: [{ from: '2026-07-26T00:00:00Z', to: '2026-07-26T00:01:00Z', availableAttemptCount: 1, attemptCount: 1, uptimePercentage: 100 }]
     }],
+    completeness: analyticsSummaryFixture().completeness
+  };
+}
+
+function modelGroupFixture(): ModelGroup {
+  return {
+    id: 3,
+    workspaceId: 1,
+    name: 'chat',
+    description: 'Primary route',
+    kind: 'text',
+    status: 'normal',
+    firstResponseTimeoutSeconds: null,
+    effectiveFirstResponseTimeoutSeconds: 180,
+    routingMode: 'tiered_failover',
+    sidecarConfigMode: 'full',
+    inboundProtocolContracts: ['openai.chat_completions/2026-07-18'],
+    mappings: [{ id: 41, groupId: 3, endpointId: 101, modelId: 'gpt-5', tier: 0, weight: 100, sortOrder: 0 }],
+    endpointTotal: 1,
+    endpointAvailable: 1,
+    createdAt: '',
+    updatedAt: ''
+  };
+}
+
+function modelGroupUptimeFixture(): ModelGroupUptimeSummaryList {
+  return {
+    window: { from: '2026-07-26T00:00:00Z', to: '2026-07-26T01:00:00Z' },
+    items: [{ groupId: 3, availableAttemptCount: 3, attemptCount: 4, uptimePercentage: 75 }],
     completeness: analyticsSummaryFixture().completeness
   };
 }

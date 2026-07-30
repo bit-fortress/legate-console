@@ -56,6 +56,7 @@ import {
   deleteSidecarToken,
   getAnalyticsSummary,
   getGroup,
+  getModelGroupUptimeSummaries,
   getSidecarSnapshot,
   getSidecarInstance,
   getWorkspaceSlug,
@@ -94,6 +95,7 @@ import type {
   Locale,
   ModelGroup,
   ModelGroupMapping,
+  ModelGroupUptimeSummary,
   ModelKind,
   Endpoint,
   DriverCatalogItem,
@@ -160,6 +162,7 @@ type SidecarView = 'instances' | 'tokens';
 type DriverView = 'builtin' | 'profiles';
 type DriverKindFilter = 'all' | ModelKind;
 type GroupMappingView = 'list' | 'visual';
+type GroupUptimeState = 'idle' | 'loading' | 'ready' | 'error';
 type ModalName = 'endpoint' | 'endpointDetail' | 'endpointGroup' | 'driverUpload' | 'driverDetail' | 'group' | 'key' | 'sidecar' | 'workspace' | 'members' | 'token' | 'delete' | null;
 type DeleteTarget = {
   kind: 'endpoint' | 'endpointGroup' | 'driverProfile' | 'group' | 'key' | 'sidecar';
@@ -366,6 +369,8 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
   const [drivers, setDrivers] = useState<DriverCatalogItem[]>([]);
   const [driverProfiles, setDriverProfiles] = useState<DriverProfile[]>([]);
   const [groups, setGroups] = useState<ModelGroup[]>([]);
+  const [groupUptimes, setGroupUptimes] = useState<ModelGroupUptimeSummary[]>([]);
+  const [groupUptimeState, setGroupUptimeState] = useState<GroupUptimeState>('idle');
   const [groupDetailLoadError, setGroupDetailLoadError] = useState<'notFound' | 'error' | ''>('');
   const [apiKeys, setAPIKeys] = useState<APIKey[]>([]);
   const [sidecars, setSidecars] = useState<SidecarToken[]>([]);
@@ -505,6 +510,10 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
 
   const analyticsRows = useMemo(() => endpointInsightRows(endpoints, endpointAttempts, analyticsKind), [endpoints, endpointAttempts, analyticsKind]);
   const filteredGroups = groups;
+  const groupUptimeByID = useMemo(
+    () => new Map(groupUptimes.map((summary) => [summary.groupId, summary])),
+    [groupUptimes]
+  );
   const filteredKeys = apiKeys;
   const filteredSidecars = sidecars;
   const sidecarVersions = useMemo(
@@ -656,12 +665,19 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     const loadDriverCatalog = readEndpointDrivers && ['endpoints', 'drivers', 'groups'].includes(pageForRequest);
     const loadDriverProfiles = readEndpointDrivers && pageForRequest === 'drivers';
     const loadGroups = readGroups && ['overview', 'groups', 'keys'].includes(pageForRequest);
+    const loadGroupUptimes = readGroups && readAnalytics && pageForRequest === 'groups' && groupDetailId == null;
     const loadKeys = readAPIKeys && ['overview', 'keys'].includes(pageForRequest);
     const loadSidecarTokens = readSidecars && (
       pageForRequest === 'overview' || (pageForRequest === 'sidecars' && sidecarView === 'tokens')
     );
     const loadAnalytics = readAnalytics && ['overview', 'analytics'].includes(pageForRequest);
     const loadPlatformWorkspaces = platform && pageForRequest === 'workspaces';
+    const groupUptimeTo = new Date();
+    const groupUptimeRange = {
+      from: new Date(groupUptimeTo.getTime() - 60 * 60 * 1000).toISOString(),
+      to: groupUptimeTo.toISOString()
+    };
+    if (loadGroupUptimes) setGroupUptimeState('loading');
     const requestPageRequest = loadAnalytics && pageForRequest === 'overview'
       ? listInvocationRequests({ limit: 8, role: 'origin', ...range })
       : Promise.resolve({ items: [], nextCursor: null });
@@ -675,13 +691,14 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       : Promise.resolve({ items: [], nextCursor: null });
 
     // Each route loads only the data it renders or needs for its edit forms.
-    const [healthResult, endpointResult, endpointGroupResult, driverResult, driverProfileResult, groupResult, keyResult, sidecarResult, summaryResult, requestPageResult, endpointAttemptPageResult, activityAttemptPageResult, workspaceResult] = await Promise.allSettled([
+    const [healthResult, endpointResult, endpointGroupResult, driverResult, driverProfileResult, groupResult, groupUptimeResult, keyResult, sidecarResult, summaryResult, requestPageResult, endpointAttemptPageResult, activityAttemptPageResult, workspaceResult] = await Promise.allSettled([
       healthz(),
       loadEndpoints ? listEndpoints() : Promise.resolve([]),
       loadEndpointGroups ? listEndpointGroups() : Promise.resolve([]),
       loadDriverCatalog ? listDrivers() : Promise.resolve([]),
       loadDriverProfiles ? listDriverProfiles() : Promise.resolve([]),
       loadGroups ? (pageForRequest === 'groups' && groupDetailId != null ? getGroup(groupDetailId).then((group) => [group]) : listGroups()) : Promise.resolve([]),
+      loadGroupUptimes ? getModelGroupUptimeSummaries(groupUptimeRange) : Promise.resolve(null),
       loadKeys ? listAPIKeys() : Promise.resolve([]),
       loadSidecarTokens ? listSidecarTokens() : Promise.resolve([]),
       loadAnalytics ? getAnalyticsSummary(range) : Promise.resolve(emptySummary),
@@ -717,6 +734,18 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
       if (groupResult.status === 'rejected' && pageForRequest === 'groups' && groupDetailId != null) {
         setGroupDetailLoadError(groupResult.reason instanceof LegateAPIError && groupResult.reason.status === 404 ? 'notFound' : 'error');
       }
+    }
+    if (loadGroupUptimes) {
+      if (groupUptimeResult.status === 'fulfilled' && groupUptimeResult.value) {
+        setGroupUptimes(groupUptimeResult.value.items);
+        setGroupUptimeState('ready');
+      } else {
+        setGroupUptimes([]);
+        setGroupUptimeState('error');
+      }
+    } else {
+      setGroupUptimes([]);
+      setGroupUptimeState('idle');
     }
     if (!readAPIKeys) setAPIKeys([]);
     else if (loadKeys && keyResult.status === 'fulfilled') setAPIKeys(keyResult.value);
@@ -777,6 +806,8 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
     setDrivers([]);
     setDriverProfiles([]);
     setGroups([]);
+    setGroupUptimes([]);
+    setGroupUptimeState('idle');
     setAPIKeys([]);
     setSidecars([]);
     setSidecarInstances([]);
@@ -1871,6 +1902,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                 <th>{t('groups.exposedInvocations')}</th>
                 <th>{t('groups.status')}</th>
                 <th>{t('groups.endpoints')}</th>
+                <th title={t('groups.uptimeWindow')}>{t('groups.uptime')}</th>
                 <th>{t('groups.mapping')}</th>
                 {canWriteGroups && <th className="actions-col">{t('actions.edit')}</th>}
               </tr>
@@ -1891,6 +1923,14 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
                     : group.inboundProtocolContracts.map((contract) => imageProtocolDisplayName(contract as ImageProtocolContract))} more={0} /></td>
                   <td><StatusBadge label={group.status === 'normal' ? t('status.normal') : t('status.disabled')} tone={group.status === 'normal' ? 'good' : 'muted'} /></td>
                   <td>{group.endpointAvailable}/{group.endpointTotal}</td>
+                  <td className="group-uptime-summary-cell">
+                    <GroupUptimeCell
+                      canReadAnalytics={canReadAnalytics}
+                      state={groupUptimeState}
+                      summary={groupUptimeByID.get(group.id)}
+                      t={t}
+                    />
+                  </td>
                   <td><TagList values={group.mappings.slice(0, 3).map(mappingLabel)} more={Math.max(0, group.mappings.length - 3)} /></td>
                   {canWriteGroups && (
                     <td>
@@ -3198,6 +3238,30 @@ function Progress({ value, label, tone }: { value: number; label?: string; tone:
       </div>
       {label && <small>{label}</small>}
     </div>
+  );
+}
+
+function GroupUptimeCell({
+  canReadAnalytics,
+  state,
+  summary,
+  t
+}: {
+  canReadAnalytics: boolean;
+  state: GroupUptimeState;
+  summary?: ModelGroupUptimeSummary;
+  t: (key: string) => string;
+}) {
+  if (!canReadAnalytics) return <span className="muted">{t('groupDetail.noPermission')}</span>;
+  if (state === 'loading' || state === 'idle') return <span className="muted">{t('groupDetail.runtimeLoading')}</span>;
+  if (state === 'error') return <span className="muted">{t('groupDetail.runtimeError')}</span>;
+  if (!summary || summary.uptimePercentage === null) return <span className="muted">{t('groupDetail.noSample')}</span>;
+  return (
+    <Progress
+      value={summary.uptimePercentage}
+      label={formatPercent(summary.uptimePercentage)}
+      tone={uptimeTone(summary.uptimePercentage)}
+    />
   );
 }
 

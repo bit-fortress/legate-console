@@ -21,6 +21,7 @@ import type {
   InvocationRequestRole,
   ModelGroup,
   ModelGroupMappingStatistics,
+  ModelGroupUptimeSummaryList,
   ModelGroupMapping,
   ModelGroupStatus,
   ModelKind,
@@ -670,6 +671,15 @@ export async function getModelGroupMappingStatistics(
     `/api/admin/analytics/model-group-mappings?${query}`,
     { signal: params.signal }
   );
+}
+
+export async function getModelGroupUptimeSummaries(
+  params: AnalyticsRangeParams = {}
+): Promise<ModelGroupUptimeSummaryList> {
+  const query = new URLSearchParams();
+  appendAnalyticsRange(query, params);
+  const suffix = query.toString() ? `?${query}` : '';
+  return request<ModelGroupUptimeSummaryList>(`/api/admin/analytics/model-groups${suffix}`);
 }
 
 export async function listInvocationRequests(params: InvocationRequestListParams = {}): Promise<InvocationRequestPage> {
