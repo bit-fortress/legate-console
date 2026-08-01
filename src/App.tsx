@@ -161,6 +161,7 @@ type AnalyticsRangeSelection =
 type SidecarView = 'instances' | 'tokens';
 type DriverView = 'builtin' | 'profiles';
 type DriverKindFilter = 'all' | ModelKind;
+type ModelGroupKindFilter = 'all' | ModelKind;
 type GroupMappingView = 'list' | 'visual';
 type GroupUptimeState = 'idle' | 'loading' | 'ready' | 'error';
 type ModalName = 'endpoint' | 'endpointDetail' | 'endpointGroup' | 'driverUpload' | 'driverDetail' | 'group' | 'key' | 'sidecar' | 'workspace' | 'members' | 'token' | 'delete' | null;
@@ -396,6 +397,7 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
 
   const [driverView, setDriverView] = useState<DriverView>('builtin');
   const [driverKindFilter, setDriverKindFilter] = useState<DriverKindFilter>('all');
+  const [modelGroupKindFilter, setModelGroupKindFilter] = useState<ModelGroupKindFilter>('all');
   const [analyticsKind, setAnalyticsKind] = useState<ModelKind>('text');
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('endpoints');
   const [analyticsRange, setAnalyticsRange] = useState<AnalyticsRangeSelection>({ kind: 'preset', key: '15m' });
@@ -509,7 +511,9 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
   }, [selectedSidecarInstance]);
 
   const analyticsRows = useMemo(() => endpointInsightRows(endpoints, endpointAttempts, analyticsKind), [endpoints, endpointAttempts, analyticsKind]);
-  const filteredGroups = groups;
+  const filteredGroups = modelGroupKindFilter === 'all'
+    ? groups
+    : groups.filter((group) => group.kind === modelGroupKindFilter);
   const groupUptimeByID = useMemo(
     () => new Map(groupUptimes.map((summary) => [summary.groupId, summary])),
     [groupUptimes]
@@ -1892,6 +1896,22 @@ export default function App({ currentAdmin, authConfig, onLogout }: AppProps) {
             </button>
           )}
         </PageIntro>
+        <div className="group-filter-bar">
+          <div className="group-kind-tabs">
+            <Segmented
+              value={modelGroupKindFilter}
+              options={[
+                { value: 'all', label: t('kind.all') },
+                { value: 'text', label: t('kind.text') },
+                { value: 'image', label: t('kind.image') },
+                { value: 'video', label: t('kind.video') }
+              ]}
+              onChange={(value) => setModelGroupKindFilter(value as ModelGroupKindFilter)}
+              testId="model-group-kind-filter"
+              ariaLabel={t('groups.kindFilter')}
+            />
+          </div>
+        </div>
         <section className="panel table-panel">
           <table className="data-table">
             <thead>

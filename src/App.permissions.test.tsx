@@ -387,6 +387,56 @@ describe('App endpoint permissions and flows', () => {
     expect(api.getModelGroupUptimeSummaries).not.toHaveBeenCalled();
   });
 
+  it('filters model groups by text, image, video, or all kinds', async () => {
+    const user = userEvent.setup();
+    const textGroup = modelGroupFixture();
+    const imageGroup: ModelGroup = {
+      ...textGroup,
+      id: 4,
+      name: 'image-generation',
+      kind: 'image',
+      inboundProtocolContracts: ['openai.images.generations/2026-07-19'],
+      mappings: []
+    };
+    const videoGroup: ModelGroup = {
+      ...textGroup,
+      id: 5,
+      name: 'video-generation',
+      kind: 'video',
+      inboundProtocolContracts: [],
+      mappings: []
+    };
+    window.history.replaceState({}, '', '/groups');
+    vi.mocked(api.listGroups).mockResolvedValue([textGroup, imageGroup, videoGroup]);
+    mockWorkspace(['model_groups:read']);
+
+    renderApp();
+
+    await screen.findByRole('button', { name: 'chat' });
+    const kindFilter = screen.getByRole('group', { name: '模型组类型' });
+    expect(within(kindFilter).getByRole('button', { name: '全部' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'image-generation' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'video-generation' })).toBeInTheDocument();
+
+    await user.click(within(kindFilter).getByRole('button', { name: '文本' }));
+    expect(screen.getByRole('button', { name: 'chat' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'image-generation' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'video-generation' })).not.toBeInTheDocument();
+
+    await user.click(within(kindFilter).getByRole('button', { name: '图片' }));
+    expect(screen.getByRole('button', { name: 'image-generation' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'chat' })).not.toBeInTheDocument();
+
+    await user.click(within(kindFilter).getByRole('button', { name: '视频' }));
+    expect(screen.getByRole('button', { name: 'video-generation' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'image-generation' })).not.toBeInTheDocument();
+
+    await user.click(within(kindFilter).getByRole('button', { name: '全部' }));
+    expect(screen.getByRole('button', { name: 'chat' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'image-generation' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'video-generation' })).toBeInTheDocument();
+  });
+
   it('loads a model group detail URL directly with the dedicated group and analytics contracts', async () => {
     const detailGroup: ModelGroup = {
       id: 3, workspaceId: 1, name: 'chat', description: 'Primary route', kind: 'text', status: 'normal',

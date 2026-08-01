@@ -1885,6 +1885,18 @@ a {
   box-shadow: none;
 }
 
+.group-filter-bar {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+}
+
+.group-kind-tabs .segmented {
+  background: var(--panel-soft);
+  box-shadow: none;
+}
+
 .driver-upload-action {
   flex: 0 0 auto;
 }
@@ -5557,8 +5569,22 @@ a {
     min-width: 0;
   }
 
+  .group-filter-bar,
+  .group-kind-tabs,
+  .group-kind-tabs .segmented {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .driver-tabs .segmented button,
   .driver-kind-tabs .segmented button {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .group-kind-tabs .segmented button {
     flex: 1 1 0;
     min-width: 0;
     justify-content: center;
